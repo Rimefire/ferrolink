@@ -18,7 +18,7 @@ namespace ferrolink::ipc::shm_channel {
 class SPSCShmChannel {
   public:
     static SPSCShmChannel create(std::string obj_name) noexcept {
-        static constexpr std::size_t size{detail::constants::SPSC_BUFFER_SIZE};
+        static constexpr std::size_t size{detail::constants::SPSCBufferSize};
 
         int fd{::shm_open(("/" + obj_name).c_str(), O_CREAT | O_EXCL, 0660)};
 
@@ -76,7 +76,7 @@ class SPSCShmChannel {
     }
 
     static SPSCShmChannel attach(std::string obj_name) noexcept {
-        static constexpr std::size_t size{detail::constants::SPSC_BUFFER_SIZE};
+        static constexpr std::size_t size{detail::constants::SPSCBufferSize};
 
         int fd{::shm_open(("/" + obj_name).c_str(), O_RDWR, 0660)};
 
@@ -147,9 +147,9 @@ class SPSCShmChannel {
 
     ~SPSCShmChannel() noexcept {
         if (shm_start_) {
-            if (munlock(shm_start_, detail::constants::SPSC_BUFFER_SIZE) != 0)
+            if (munlock(shm_start_, detail::constants::SPSCBufferSize) != 0)
                 std::print(stderr, "[WARN] munlock failed. ERRNO: {}\n", std::strerror(errno));
-            if (munmap(shm_start_, detail::constants::SPSC_BUFFER_SIZE) != 0)
+            if (munmap(shm_start_, detail::constants::SPSCBufferSize) != 0)
                 std::print(stderr, "[WARN] munmap failed. ERRNO: {}\n", std::strerror(errno));
             if (is_creator_) {
                 if (shm_unlink(("/" + obj_name_).c_str()) != 0)
