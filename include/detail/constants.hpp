@@ -4,5 +4,5 @@
 #include <cstddef>
 
 namespace ferrolink::detail::constants {
-inline constexpr std::size_t SPSC_BUFFER_SIZE{sizeof(ipc::spsc::SPSCBuffer)};
+inline constexpr std::size_t SPSCBufferSize{sizeof(ipc::spsc::SPSCBuffer)};
 } // namespace ferrolink::detail::constants
