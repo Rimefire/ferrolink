@@ -15,3 +15,9 @@ template <typename T, std::size_t Capacity>
 bool SPSCBuffer<T, Capacity>::empty() const noexcept {
     return write_index_.load(std::memory_order_acquire) == read_index_.load(std::memory_order_relaxed);
 }
+
+template <typename T, std::size_t Capacity>
+    requires TriviallyCopyable<T>
+std::size_t SPSCBuffer<T, Capacity>::filled_size() const noexcept {
+    return write_index_.load(std::memory_order_acquire) - read_index_.load(std::memory_order_acquire);
+}
