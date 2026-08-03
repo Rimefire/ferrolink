@@ -1,6 +1,6 @@
 template <typename T, std::size_t Capacity>
     requires TriviallyCopyable<T>
-static constexpr std::size_t SPSCBuffer<T, Capacity>::capacity() noexcept {
+constexpr std::size_t SPSCBuffer<T, Capacity>::capacity() noexcept {
         return Capacity;
 }
 
@@ -26,7 +26,7 @@ template <typename T, std::size_t Capacity>
     requires TriviallyCopyable<T>
 bool SPSCBuffer<T, Capacity>::push(T value) noexcept {
     const auto curr_write_idx{write_index_.load(std::memory_order_relaxed)};
-    const auto curr_read_idx{read_index_.load(std::memory_order_acauire)}
+    const auto curr_read_idx{read_index_.load(std::memory_order_acquire)}
 
     if (curr_write_idx - curr_read_idx == Capacity) return false;
 
@@ -34,5 +34,19 @@ bool SPSCBuffer<T, Capacity>::push(T value) noexcept {
     
     write_index_.store(curr_write_idx + 1, std::memory_order_release);
 
+    return true;
+}
+
+template <typename T, std::size_t Capacity>
+    requires TriviallyCopyable<T>
+bool SPSCBuffer<T, Capacity>::pop(T& out) noexcept {
+    const auto curr_read_idx{read_index_.load(std::memory_order_relaxed)};
+    const auto curr_write_idx{write_index_.load(std::memory_order_acquire)};
+
+    if (curr_write_idx == curr_read_idx) return false;
+
+    out = slots_[curr_read_idx & mask_];
+
+    read_index_.store(curr_read_idx + 1, std::memory_order_release);
     return true;
 }
