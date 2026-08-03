@@ -18,8 +18,8 @@ class SPSCBuffer {
                   "Capacity must be greater than zero and must be a power of two.");
 
   public:
-    SPSCBuffer() noexcept;
-    ~SPSCBuffer() noexcept;
+    SPSCBuffer() noexcept  = default;
+    ~SPSCBuffer() noexcept = default;
 
     SPSCBuffer(const SPSCBuffer&)            = delete;
     SPSCBuffer& operator=(const SPSCBuffer&) = delete;
@@ -50,3 +50,5 @@ class SPSCBuffer {
 };
 
 } // namespace ferrolink::ipc::spsc
+
+#include "spsc_buffer.inl"
