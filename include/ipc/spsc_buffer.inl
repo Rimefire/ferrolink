@@ -21,3 +21,18 @@ template <typename T, std::size_t Capacity>
 std::size_t SPSCBuffer<T, Capacity>::filled_size() const noexcept {
     return write_index_.load(std::memory_order_acquire) - read_index_.load(std::memory_order_acquire);
 }
+
+template <typename T, std::size_t Capacity>
+    requires TriviallyCopyable<T>
+bool SPSCBuffer<T, Capacity>::push(T value) noexcept {
+    const auto curr_write_idx{write_index_.load(std::memory_order_relaxed)};
+    const auto curr_read_idx{read_index_.load(std::memory_order_acauire)}
+
+    if (curr_write_idx - curr_read_idx == Capacity) return false;
+
+    slots_[curr_write_idx & mask_] = value;
+    
+    write_index_.store(curr_write_idx + 1, std::memory_order_release);
+
+    return true;
+}
