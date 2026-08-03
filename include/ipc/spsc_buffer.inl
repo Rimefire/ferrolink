@@ -1,3 +1,5 @@
+namespace ferrolink::ipc::spsc {
+
 template <typename T, std::size_t Capacity>
     requires TriviallyCopyable<T>
 constexpr std::size_t SPSCBuffer<T, Capacity>::capacity() noexcept {
@@ -49,4 +51,5 @@ bool SPSCBuffer<T, Capacity>::pop(T& out) noexcept {
 
     read_index_.store(curr_read_idx + 1, std::memory_order_release);
     return true;
+}
 }
