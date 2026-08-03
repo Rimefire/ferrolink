@@ -158,6 +158,14 @@ class SPSCShmChannel {
         }
     }
 
+    bool role() const noexcept { return is_creator_; }
+
+    const spsc::SPSCBuffer* buffer() const noexcept { return buffer_; }
+
+    bool is_valid() const noexcept { return shm_start_ != nullptr && buffer_ != nullptr; }
+
+    const std::string& name() const noexcept { return obj_name_; }
+
   private:
     explicit SPSCShmChannel(std::byte*        shm_start  = nullptr,
                             spsc::SPSCBuffer* buffer     = nullptr,
