@@ -6,6 +6,7 @@
 #include <concepts>
 #include <cstddef>
 #include <type_traits>
+#include <utility>
 
 namespace ferrolink::ipc::spsc {
 template <typename T>
@@ -24,10 +25,8 @@ class SPSCBuffer {
     SPSCBuffer(const SPSCBuffer&)            = delete;
     SPSCBuffer& operator=(const SPSCBuffer&) = delete;
 
-    friend void swap(SPSCBuffer& src, SPSCBuffer& dest) noexcept;
-
-    SPSCBuffer(SPSCBuffer&& other) noexcept;
-    SPSCBuffer& operator=(SPSCBuffer&& other) noexcept;
+    SPSCBuffer(SPSCBuffer&& other)            = delete;
+    SPSCBuffer& operator=(SPSCBuffer&& other) = delete;
 
     bool push(T value) noexcept;
 
