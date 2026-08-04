@@ -111,4 +111,50 @@ TEST(SPSCBufferBasic, FifoOrderPreservedUnderPartialDrain) {
     EXPECT_TRUE(buf.empty());
 }
 
+TEST(SPSCBufferWraparound, SurvivesManyFullCyclesWithoutCorruption) {
+    SmallBuffer   buf;
+    constexpr int kCycles = 1'000'000;
+    for (int cycle = 0; cycle < kCycles; ++cycle) {
+        TickMessage in = make_tick(static_cast<std::uint64_t>(cycle));
+        ASSERT_TRUE(buf.push(in));
+        TickMessage out{};
+        ASSERT_TRUE(buf.pop(out));
+        ASSERT_EQ(in, out) << "corruption at cycle " << cycle;
+    }
+    EXPECT_TRUE(buf.empty());
+}
+
+TEST(SPSCBufferWraparound, IndicesGrowMonotonicallyAcrossManyWraps) {
+    SmallBuffer   buf;
+    constexpr int kPushes = 500'000;
+    for (int i = 0; i < kPushes; ++i) {
+        ASSERT_TRUE(buf.push(make_tick(static_cast<std::uint64_t>(i))));
+        TickMessage out{};
+        ASSERT_TRUE(buf.pop(out));
+        ASSERT_EQ(out.id, static_cast<std::uint64_t>(i));
+    }
+}
+
+TEST(SPSCBufferWraparound, PartialFillDrainCyclesAcrossWrap) {
+    SmallBuffer   buf;
+    std::uint64_t next_expected = 0;
+    std::uint64_t next_id       = 0;
+
+    for (int round = 0; round < 200'000; ++round) {
+        int push_count = (round % 3) + 1;
+        int pop_count  = (round % 2 == 0) ? push_count : push_count - 1;
+
+        for (int i = 0; i < push_count && !buf.full(); ++i) {
+            ASSERT_TRUE(buf.push(make_tick(next_id)));
+            ++next_id;
+        }
+        for (int i = 0; i < pop_count && !buf.empty(); ++i) {
+            TickMessage out{};
+            ASSERT_TRUE(buf.pop(out));
+            ASSERT_EQ(out.id, next_expected);
+            ++next_expected;
+        }
+    }
+}
+
 } // namespace ferrolink::ipc::spsc::test
