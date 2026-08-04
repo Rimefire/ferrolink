@@ -301,7 +301,7 @@ TEST(SPSCBufferBoundary, LargeCapacityDoesNotCorruptFarApartSlots) {
     EXPECT_TRUE(buf->empty());
 }
 
-EST(SPSCBufferFilledSize, TracksExactCountThroughInterleavedOps) {
+TEST(SPSCBufferFilledSize, TracksExactCountThroughInterleavedOps) {
     MidBuffer buf;
     EXPECT_EQ(buf.filled_size(), 0u);
 
