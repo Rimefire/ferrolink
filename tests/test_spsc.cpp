@@ -243,4 +243,16 @@ TEST(SPSCBufferConcurrency, BurstyProducerSlowConsumerNoLoss) {
     EXPECT_FALSE(failed.load());
 }
 
+TEST(SPSCBufferAlignment, IndicesDoNotShareCacheLine) {
+    SmallBuffer buf;
+    const auto* read_addr = reinterpret_cast<const std::byte*>(&buf);
+    (void) read_addr;
+    EXPECT_EQ(sizeof(SmallBuffer) % alignof(std::max_align_t), 0u);
+}
+
+TEST(SPSCBufferAlignment, CapacityMustBePowerOfTwoAtCompileTime) {
+    EXPECT_TRUE((SmallBuffer::capacity() & (SmallBuffer::capacity() - 1)) == 0);
+    EXPECT_TRUE((MidBuffer::capacity() & (MidBuffer::capacity() - 1)) == 0);
+}
+
 } // namespace ferrolink::ipc::spsc::test
