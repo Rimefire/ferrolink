@@ -1,5 +1,5 @@
 #pragma once
-#include "../detail/cache_line.hpp"
+#include "detail/cache_line.hpp"
 
 #include <array>
 #include <atomic>
