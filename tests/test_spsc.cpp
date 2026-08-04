@@ -157,4 +157,90 @@ TEST(SPSCBufferWraparound, PartialFillDrainCyclesAcrossWrap) {
     }
 }
 
+TEST(SPSCBufferConcurrency, ProducerConsumerNoDataLossNoCorruption) {
+    static constexpr std::uint64_t kTotal = 5'000'000;
+    MidBuffer                      buf;
+
+    std::atomic<bool>          failed{false};
+    std::atomic<std::uint64_t> produced{0};
+
+    std::thread producer([&] {
+        for (std::uint64_t i = 0; i < kTotal; ++i) {
+            TickMessage msg = make_tick(i);
+            while (!buf.push(msg)) {
+                std::this_thread::yield();
+            }
+            ++produced;
+        }
+    });
+
+    std::thread consumer([&] {
+        std::uint64_t expected = 0;
+        while (expected < kTotal) {
+            TickMessage out{};
+            if (buf.pop(out)) {
+                if (out.id != expected) {
+                    failed.store(true, std::memory_order_relaxed);
+                    return;
+                }
+                TickMessage reference = make_tick(expected);
+                if (!(out == reference)) {
+                    failed.store(true, std::memory_order_relaxed);
+                    return;
+                }
+                ++expected;
+            } else {
+                std::this_thread::yield();
+            }
+        }
+    });
+
+    producer.join();
+    consumer.join();
+
+    EXPECT_FALSE(failed.load());
+    EXPECT_EQ(produced.load(), kTotal);
+    EXPECT_TRUE(buf.empty());
+}
+
+TEST(SPSCBufferConcurrency, BurstyProducerSlowConsumerNoLoss) {
+    static constexpr std::uint64_t kTotal = 200'000;
+    SmallBuffer                    buf;
+
+    std::atomic<bool> failed{false};
+
+    std::thread producer([&] {
+        for (std::uint64_t i = 0; i < kTotal; ++i) {
+            TickMessage msg = make_tick(i);
+            while (!buf.push(msg)) {
+                std::this_thread::yield();
+            }
+        }
+    });
+
+    std::thread consumer([&] {
+        std::uint64_t expected = 0;
+        while (expected < kTotal) {
+            TickMessage out{};
+            if (buf.pop(out)) {
+                if (out.id != expected) {
+                    failed.store(true, std::memory_order_relaxed);
+                    return;
+                }
+                ++expected;
+                if (expected % 997 == 0) {
+                    std::this_thread::sleep_for(std::chrono::microseconds(50));
+                }
+            } else {
+                std::this_thread::yield();
+            }
+        }
+    });
+
+    producer.join();
+    consumer.join();
+
+    EXPECT_FALSE(failed.load());
+}
+
 } // namespace ferrolink::ipc::spsc::test
