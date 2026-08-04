@@ -28,7 +28,7 @@ template <typename T, std::size_t Capacity>
     requires TriviallyCopyable<T>
 bool SPSCBuffer<T, Capacity>::push(T value) noexcept {
     const auto curr_write_idx{write_index_.load(std::memory_order_relaxed)};
-    const auto curr_read_idx{read_index_.load(std::memory_order_acquire)}
+    const auto curr_read_idx{read_index_.load(std::memory_order_acquire)};
 
     if (curr_write_idx - curr_read_idx == Capacity) return false;
 
