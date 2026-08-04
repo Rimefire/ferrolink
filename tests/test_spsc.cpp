@@ -1,4 +1,4 @@
-#include "../include/ipc/spsc_buffer.hpp"
+#include "ipc/spsc_buffer.hpp"
 
 #include <atomic>
 #include <cstdint>
