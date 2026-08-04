@@ -1,5 +1,5 @@
 #pragma once
-#include "../detail/constants.hpp"
+#include "detail/constants.hpp"
 #include "spsc_buffer.hpp"
 
 #include <cstddef>
