@@ -255,4 +255,50 @@ TEST(SPSCBufferAlignment, CapacityMustBePowerOfTwoAtCompileTime) {
     EXPECT_TRUE((MidBuffer::capacity() & (MidBuffer::capacity() - 1)) == 0);
 }
 
+TEST(SPSCBufferBoundary, CapacityOneBufferWorks) {
+    SPSCBuffer<TickMessage, 1> buf;
+    EXPECT_TRUE(buf.empty());
+    ASSERT_TRUE(buf.push(make_tick(1)));
+    EXPECT_TRUE(buf.full());
+    EXPECT_FALSE(buf.push(make_tick(2)));
+
+    TickMessage out{};
+    ASSERT_TRUE(buf.pop(out));
+    EXPECT_EQ(out.id, 1u);
+    EXPECT_TRUE(buf.empty());
+}
+
+TEST(SPSCBufferBoundary, RepeatedFillDrainOnCapacityOneBuffer) {
+    SPSCBuffer<TickMessage, 1> buf;
+    for (std::uint64_t i = 0; i < 100'000; ++i) {
+        ASSERT_TRUE(buf.push(make_tick(i)));
+        TickMessage out{};
+        ASSERT_TRUE(buf.pop(out));
+        ASSERT_EQ(out.id, i);
+    }
+}
+
+TEST(SPSCBufferBoundary, LargeCapacityDoesNotCorruptFarApartSlots) {
+    static constexpr std::size_t kCap = 1 << 16;
+    auto                         buf  = std::make_unique<SPSCBuffer<TickMessage, kCap>>();
+
+    for (std::uint64_t i = 0; i < kCap; ++i) {
+        ASSERT_TRUE(buf->push(make_tick(i)));
+    }
+    ASSERT_TRUE(buf->full());
+
+    TickMessage out{};
+    ASSERT_TRUE(buf->pop(out));
+    EXPECT_EQ(out.id, 0u);
+    ASSERT_TRUE(buf->push(make_tick(999999)));
+
+    for (std::uint64_t i = 1; i < kCap; ++i) {
+        ASSERT_TRUE(buf->pop(out));
+        ASSERT_EQ(out.id, i) << "mismatch at logical position " << i;
+    }
+    ASSERT_TRUE(buf->pop(out));
+    EXPECT_EQ(out.id, 999999u);
+    EXPECT_TRUE(buf->empty());
+}
+
 } // namespace ferrolink::ipc::spsc::test
