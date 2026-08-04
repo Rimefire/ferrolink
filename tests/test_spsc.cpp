@@ -301,4 +301,39 @@ TEST(SPSCBufferBoundary, LargeCapacityDoesNotCorruptFarApartSlots) {
     EXPECT_TRUE(buf->empty());
 }
 
+EST(SPSCBufferFilledSize, TracksExactCountThroughInterleavedOps) {
+    MidBuffer buf;
+    EXPECT_EQ(buf.filled_size(), 0u);
+
+    for (int i = 0; i < 10; ++i) {
+        ASSERT_TRUE(buf.push(make_tick(static_cast<std::uint64_t>(i))));
+    }
+    EXPECT_EQ(buf.filled_size(), 10u);
+
+    TickMessage out{};
+    for (int i = 0; i < 4; ++i) {
+        ASSERT_TRUE(buf.pop(out));
+    }
+    EXPECT_EQ(buf.filled_size(), 6u);
+
+    for (int i = 0; i < 4; ++i) {
+        ASSERT_TRUE(buf.push(make_tick(100 + static_cast<std::uint64_t>(i))));
+    }
+    EXPECT_EQ(buf.filled_size(), 10u);
+}
+
+TEST(SPSCBufferFilledSize, NeverExceedsCapacityAcrossRandomizedOps) {
+    MidBuffer     buf;
+    std::uint64_t next_id = 0;
+
+    for (int op = 0; op < 500'000; ++op) {
+        if (op % 3 != 0 && !buf.full()) {
+            ASSERT_TRUE(buf.push(make_tick(next_id++)));
+        } else if (!buf.empty()) {
+            TickMessage out{};
+            ASSERT_TRUE(buf.pop(out));
+        }
+        ASSERT_LE(buf.filled_size(), MidBuffer::capacity());
+    }
+}
 } // namespace ferrolink::ipc::spsc::test
