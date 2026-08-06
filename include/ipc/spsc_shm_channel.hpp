@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <cstdio
 #include <utility>
 
 namespace ferrolink::ipc::shm_channel {
@@ -124,17 +125,16 @@ class SPSCShmChannel {
         if (::madvise(shm_start, shm_size_, MADV_SEQUENTIAL) != 0)
             std::print(stderr,
                        "[WARN] madvise with MADV_SEQUENTIAL in "
-                       "SPSCShmChannel::create function failed. ERRNO: {}\n",
+                       "SPSCShmChannel::setup_memory function failed. ERRNO: {}\n",
                        std::strerror(errno));
         if (::madvise(shm_start, shm_size_, MADV_WILLNEED) != 0)
             std::print(stderr,
-                       "[WARN] madvise with MADV_WILLNEED in SPSCShmChannel::create "
+                       "[WARN] madvise with MADV_WILLNEED in SPSCShmChannel::setup_memory "
                        "function failed. ERRNO: {}\n",
                        std::strerror(errno));
         if (::madvise(shm_start, shm_size_, MADV_HUGEPAGE) != 0)
             std::print(stderr,
-                       "[WARN] madvise with MADV_HUGEPAGE in SPSCShmChannel::create "
-                       "function failed. ERRNO: {}\n",
+                       "[WARN] madvise with MADV_HUGEPAGE in SPSCBuffer::setup_memory failed. ERRNO: {}\n",
                        std::strerror(errno));
 
         if (::mlock(shm_start, shm_size_) != 0) {
