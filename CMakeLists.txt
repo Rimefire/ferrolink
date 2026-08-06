@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(ferrolink
-    VERSION 0.1.0
+    VERSION 0.3.0
     DESCRIPTION "Low-latency SPSC shared-memory IPC transport"
     LANGUAGES CXX
 )
