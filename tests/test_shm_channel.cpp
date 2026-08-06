@@ -1,5 +1,3 @@
-#include "spsc_shm_channel.hpp"
-
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -7,6 +5,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <gtest/gtest.h>
+#include <ipc/spsc_shm_channel.hpp>
 #include <numeric>
 #include <optional>
 #include <random>
