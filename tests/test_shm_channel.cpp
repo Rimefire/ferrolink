@@ -117,3 +117,143 @@ inline bool wait_child_success(pid_t pid) {
         return false;
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
+
+// Lifecycle & ownership & move semantics
+class ShmChannelLifecycleTest : public ::testing::Test {
+  protected:
+    using Channel = SPSCShmChannel<int, 16>;
+};
+
+TEST_F(ShmChannelLifecycleTest, CreateProducesValidCreatorChannel) {
+    const auto   name = unique_shm_name("create_valid");
+    ShmNameGuard guard{name};
+
+    Channel ch = Channel::create(name);
+
+    EXPECT_TRUE(ch.is_valid());
+    EXPECT_TRUE(ch.role()); // creator == true
+    EXPECT_EQ(ch.name(), name);
+    EXPECT_EQ(ch.shm_size(), sizeof(Channel::Buffer));
+    ASSERT_NE(ch.buffer(), nullptr);
+    EXPECT_TRUE(ch.buffer()->empty());
+    EXPECT_FALSE(ch.buffer()->full());
+    EXPECT_EQ(ch.buffer()->filled_size(), 0u);
+}
+
+TEST_F(ShmChannelLifecycleTest, AttachToExistingSegmentSucceeds) {
+    const auto   name = unique_shm_name("attach_ok");
+    ShmNameGuard guard{name};
+
+    Channel creator = Channel::create(name);
+    ASSERT_TRUE(creator.is_valid());
+
+    Channel attacher = Channel::attach(name);
+
+    EXPECT_TRUE(attacher.is_valid());
+    EXPECT_FALSE(attacher.role()); // attach -> is_creator == false
+    EXPECT_EQ(attacher.name(), name);
+    // Both instances view the same logical buffer: a write through one
+    // is visible through the other without any intermediate re-creation.
+    ASSERT_TRUE(creator.buffer()->push(42));
+    int out = 0;
+    ASSERT_TRUE(attacher.buffer()->pop(out));
+    EXPECT_EQ(out, 42);
+}
+
+TEST_F(ShmChannelLifecycleTest, OnlyCreatorUnlinksOnDestruction) {
+    const auto name     = unique_shm_name("unlink_owner");
+    const auto shm_path = "/dev/shm/" + name;
+
+    {
+        Channel creator = Channel::create(name);
+        ASSERT_TRUE(creator.is_valid());
+
+        {
+            Channel attacher = Channel::attach(name);
+            ASSERT_TRUE(attacher.is_valid());
+            // Attacher is destroyed first — the segment must not disappear,
+            // since unlink ownership belongs exclusively to the creator.
+        }
+
+        // The segment must still exist: attach() never performs an unlink.
+        int fd = ::shm_open(("/" + name).c_str(), O_RDONLY, 0660);
+        EXPECT_GE(fd, 0) << "shm segment must survive attacher destruction";
+        if (fd >= 0)
+            ::close(fd);
+    }
+
+    // After the creator is destroyed, the segment must be unlinked.
+    int fd_after = ::shm_open(("/" + name).c_str(), O_RDONLY, 0660);
+    EXPECT_LT(fd_after, 0) << "shm segment must be unlinked after creator destruction";
+    if (fd_after >= 0)
+        ::close(fd_after);
+}
+
+TEST_F(ShmChannelLifecycleTest, MoveConstructionTransfersOwnershipAndInvalidatesSource) {
+    const auto   name = unique_shm_name("move_ctor");
+    ShmNameGuard guard{name};
+
+    Channel original = Channel::create(name);
+    ASSERT_TRUE(original.is_valid());
+    auto* buf_ptr = original.buffer();
+
+    Channel moved{std::move(original)};
+
+    EXPECT_TRUE(moved.is_valid());
+    EXPECT_TRUE(moved.role());
+    EXPECT_EQ(moved.buffer(), buf_ptr);
+    EXPECT_EQ(moved.name(), name);
+
+    // After the move, the source must be in a valid "empty" state
+    // (swapped with a default-constructed temporary) and own no resource.
+    EXPECT_FALSE(original.is_valid());
+    EXPECT_EQ(original.buffer(), nullptr);
+}
+
+TEST_F(ShmChannelLifecycleTest, MoveAssignmentTransfersOwnershipAndUnlinksOldTarget) {
+    const auto   name_a = unique_shm_name("move_assign_a");
+    const auto   name_b = unique_shm_name("move_assign_b");
+    ShmNameGuard guard_a{name_a};
+    ShmNameGuard guard_b{name_b};
+
+    Channel a = Channel::create(name_a);
+    Channel b = Channel::create(name_b);
+    ASSERT_TRUE(a.is_valid());
+    ASSERT_TRUE(b.is_valid());
+
+    a = std::move(b);
+
+    // After the move-assign, `a` now owns whatever `b` used to own (name_b).
+    EXPECT_EQ(a.name(), name_b);
+    EXPECT_TRUE(a.role());
+
+    // The old resource of `a` (name_a) was destroyed by the temporary
+    // inside move-assign (see SPSCShmChannel::operator=: temp swap idiom),
+    // so its shm segment must have been unlinked.
+    int fd = ::shm_open(("/" + name_a).c_str(), O_RDONLY, 0660);
+    EXPECT_LT(fd, 0) << "old resource of move-assigned-to object must be released";
+    if (fd >= 0)
+        ::close(fd);
+}
+
+TEST_F(ShmChannelLifecycleTest, DifferentInstancesHaveIndependentNamesAfterCreate) {
+    const auto   name1 = unique_shm_name("indep_1");
+    const auto   name2 = unique_shm_name("indep_2");
+    ShmNameGuard g1{name1};
+    ShmNameGuard g2{name2};
+
+    Channel c1 = Channel::create(name1);
+    Channel c2 = Channel::create(name2);
+
+    EXPECT_NE(c1.name(), c2.name());
+    EXPECT_NE(c1.buffer(), c2.buffer());
+
+    ASSERT_TRUE(c1.buffer()->push(1));
+    ASSERT_TRUE(c2.buffer()->push(2));
+
+    int out1 = 0, out2 = 0;
+    ASSERT_TRUE(c1.buffer()->pop(out1));
+    ASSERT_TRUE(c2.buffer()->pop(out2));
+    EXPECT_EQ(out1, 1);
+    EXPECT_EQ(out2, 2);
+}
