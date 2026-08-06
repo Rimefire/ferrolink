@@ -18,15 +18,7 @@ class SPSCShmChannel {
   public:
     using Buffer = spsc::SPSCBuffer<T, Capacity>;
     static SPSCShmChannel create(std::string obj_name) noexcept {
-        int fd{::shm_open(("/" + obj_name).c_str(), O_CREAT | O_EXCL | O_RDWR, 0660)};
-
-        if (fd == -1) {
-            std::print(stderr,
-                       "[FATAL] Cannot get file descriptor for shared memory block. "
-                       "ERRNO: {}\n",
-                       std::strerror(errno));
-            std::abort();
-        }
+        int fd{open_shm(obj_name, O_CREAT | O_EXCL | O_RDWR)};
 
         auto cleanup{[&fd]() { ::close(fd); }};
 
@@ -55,15 +47,7 @@ class SPSCShmChannel {
     }
 
     static SPSCShmChannel attach(std::string obj_name) noexcept {
-        int fd{::shm_open(("/" + obj_name).c_str(), O_RDWR, 0660)};
-
-        if (fd == -1) {
-            std::print(stderr,
-                       "[FATAL] Cannot get file descriptor for shared memory block. "
-                       "ERRNO: {}\n",
-                       std::strerror(errno));
-            std::abort();
-        }
+        int fd{open_shm(obj_name, O_RDWR)};
 
         auto cleanup{[&fd]() { ::close(fd); }};
 
@@ -157,6 +141,19 @@ class SPSCShmChannel {
             std::print(stderr, "[FATAL] Cannot lock virtual address space into RAM. ERRNO: {}\n", std::strerror(errno));
             std::abort();
         }
+    }
+
+    static int open_shm(const std::string& name, int flags) noexcept {
+        int fd{::shm_open(("/" + name).c_str(), flags, 0660)};
+
+        if (fd == -1) {
+            std::print(stderr,
+                       "[FATAL] Cannot get file descriptor for shared memory block. ERRNO: {}\n",
+                       std::strerror(errno));
+            std::abort();
+        }
+
+        return fd;
     }
 
     std::string                  obj_name_{""};
