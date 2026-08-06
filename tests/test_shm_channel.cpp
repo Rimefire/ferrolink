@@ -297,3 +297,84 @@ TEST_F(ShmChannelDeathTest, AttachToNonexistentNameAborts) {
         },
         "");
 }
+
+// FIFO / buffer-boundary correctness through a real shm channel, but
+// within a single process (a fast sanity-check before the fork tests).
+class ShmChannelBufferSemanticsTest : public ::testing::Test {
+  protected:
+    using Channel = SPSCShmChannel<std::uint64_t, 8>; // capacity=8, power of two
+
+    void SetUp() override {
+        name_ = unique_shm_name("buf_sem");
+        guard_.emplace(name_);
+        channel_.emplace(Channel::create(name_));
+        ASSERT_TRUE(channel_->is_valid());
+    }
+
+    std::string                 name_;
+    std::optional<ShmNameGuard> guard_;
+    std::optional<Channel>      channel_;
+};
+
+TEST_F(ShmChannelBufferSemanticsTest, FIFOOrderPreserved) {
+    auto* buf = channel_->buffer();
+    for (std::uint64_t i = 0; i < Channel::Buffer::capacity(); ++i) {
+        ASSERT_TRUE(buf->push(i));
+    }
+    EXPECT_TRUE(buf->full());
+    EXPECT_FALSE(buf->push(999)); // must reject when full, no silent overwrite
+
+    for (std::uint64_t i = 0; i < Channel::Buffer::capacity(); ++i) {
+        std::uint64_t out = 0;
+        ASSERT_TRUE(buf->pop(out));
+        EXPECT_EQ(out, i) << "FIFO order violated at index " << i;
+    }
+    EXPECT_TRUE(buf->empty());
+
+    std::uint64_t dummy = 0;
+    EXPECT_FALSE(buf->pop(dummy)); // must reject when empty
+}
+
+TEST_F(ShmChannelBufferSemanticsTest, WrapAroundMaintainsOrderAndCounts) {
+    auto*             buf = channel_->buffer();
+    const std::size_t cap = Channel::Buffer::capacity();
+
+    // Push values through the buffer totaling 10x its capacity, alternating
+    // push/pop so the physical index (write_index & mask) wraps around
+    // Capacity many times over. This catches any masking (mask_) errors at
+    // the array boundary.
+    std::uint64_t       produced = 0;
+    std::uint64_t       consumed = 0;
+    const std::uint64_t total    = cap * 10;
+
+    while (consumed < total) {
+        while (produced < total && buf->filled_size() < cap) {
+            ASSERT_TRUE(buf->push(produced));
+            ++produced;
+        }
+        std::uint64_t out = 0;
+        if (buf->pop(out)) {
+            EXPECT_EQ(out, consumed) << "order violated after wrap-around";
+            ++consumed;
+        }
+    }
+    EXPECT_EQ(produced, total);
+    EXPECT_EQ(consumed, total);
+    EXPECT_TRUE(buf->empty());
+}
+
+TEST_F(ShmChannelBufferSemanticsTest, FilledSizeTracksExactly) {
+    auto*             buf = channel_->buffer();
+    const std::size_t cap = Channel::Buffer::capacity();
+
+    EXPECT_EQ(buf->filled_size(), 0u);
+    for (std::size_t i = 0; i < cap; ++i) {
+        ASSERT_TRUE(buf->push(i));
+        EXPECT_EQ(buf->filled_size(), i + 1);
+    }
+    for (std::size_t i = 0; i < cap; ++i) {
+        std::uint64_t out = 0;
+        ASSERT_TRUE(buf->pop(out));
+        EXPECT_EQ(buf->filled_size(), cap - i - 1);
+    }
+}
