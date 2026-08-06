@@ -37,7 +37,7 @@ class SPSCShmChannel {
             std::abort();
         }
 
-        void* mmap_result{::mmap(nullptr, shm_size_, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_NORESERVE, fd, 0)};
+        void* mmap_result{::mmap(nullptr, shm_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)};
         int   saved_errno{errno};
         cleanup();
 
@@ -165,6 +165,8 @@ class SPSCShmChannel {
     bool is_valid() const noexcept { return shm_start_ != nullptr && buffer_ != nullptr; }
 
     const std::string& name() const noexcept { return obj_name_; }
+
+    std::size_t shm_size() const noexcept { return shm_size_; }
 
   private:
     explicit SPSCShmChannel(std::byte*  shm_start  = nullptr,
