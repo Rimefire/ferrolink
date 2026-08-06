@@ -378,3 +378,256 @@ TEST_F(ShmChannelBufferSemanticsTest, FilledSizeTracksExactly) {
         EXPECT_EQ(buf->filled_size(), cap - i - 1);
     }
 }
+
+// Cross-process IPC via fork(): two REAL processes with separate
+// address spaces, communicating exclusively through POSIX shared
+// memory. This is the core of the "hardest" tests, since only here do
+// we verify genuine cross-process visibility of atomic state
+// (std::atomic in shared memory between processes requires a lock-free
+// implementation without futex addresses tied to a single process — if
+// the platform gives us a non-lock-free atomic<size_t>, these tests will catch it).
+
+class ShmChannelCrossProcessTest : public ::testing::Test {
+  protected:
+    using Channel = SPSCShmChannel<OrderMsg, 1024>;
+};
+
+// Verify at the test level (not relying on luck) that atomic<size_t> in
+// the buffer is actually lock-free — otherwise cross-process
+// synchronization is not correctly possible in principle, since
+// libstdc++'s mutex fallback for non-lock-free atomics uses addresses
+// that are not guaranteed to be valid across processes on some
+// implementations.
+TEST_F(ShmChannelCrossProcessTest, AtomicIndicesAreLockFreeAcrossProcessBoundary) {
+    ASSERT_TRUE(std::atomic<std::size_t>{}.is_lock_free())
+        << "SPSCBuffer relies on lock-free atomics for correct cross-process "
+           "semantics; this platform's atomic<size_t> is not lock-free.";
+}
+
+TEST_F(ShmChannelCrossProcessTest, ProducerChildConsumerParentFullIntegrity) {
+    const auto   name = unique_shm_name("xproc_basic");
+    ShmNameGuard guard{name};
+
+    constexpr std::uint64_t kMessageCount = 200'000;
+
+    // The parent creates the channel BEFORE fork(), guaranteeing that
+    // placement-new has already run in shared memory before the child
+    // performs attach() (see the architectural-contract note at the top
+    // of this file about attach() not doing placement-new).
+    Channel parent_channel = Channel::create(name);
+    ASSERT_TRUE(parent_channel.is_valid());
+
+    pid_t pid = ::fork();
+    ASSERT_NE(pid, -1) << "fork failed: " << std::strerror(errno);
+
+    if (pid == 0) {
+        // --- Child process: producer ---
+        Channel child_channel = Channel::attach(name);
+        if (!child_channel.is_valid())
+            _exit(1);
+
+        auto* buf = child_channel.buffer();
+        for (std::uint64_t seq = 0; seq < kMessageCount; ++seq) {
+            OrderMsg msg = OrderMsg::make(seq);
+            while (!buf->push(msg)) {
+                // Busy-spin: the buffer is full, waiting on the consumer.
+                // This is expected in an HFT SPSC pattern with no
+                // blocking primitives.
+                std::this_thread::yield();
+            }
+        }
+        // Deliberately not relying on the destructor to unlink: the
+        // child's attach-object doesn't own the segment (role()==false),
+        // so its destructor won't touch it anyway.
+        _exit(0);
+    }
+
+    // --- Parent process: consumer ---
+    auto* buf = parent_channel.buffer();
+
+    std::uint64_t expected_seq = 0;
+    std::uint64_t received     = 0;
+    const auto    deadline     = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+
+    while (received < kMessageCount) {
+        OrderMsg out{};
+        if (buf->pop(out)) {
+            ASSERT_TRUE(out.is_internally_consistent())
+                << "torn/corrupted read detected at logical position " << received << " (seq field=" << out.seq
+                << ") — SPSC visibility contract violated";
+            ASSERT_EQ(out.seq, expected_seq) << "message reordering or loss detected across "
+                                                "process boundary at position "
+                                             << received;
+            ++expected_seq;
+            ++received;
+        } else {
+            ASSERT_LT(std::chrono::steady_clock::now(), deadline)
+                << "consumer stalled: producer child likely died or deadlocked; received=" << received << "/"
+                << kMessageCount;
+            std::this_thread::yield();
+        }
+    }
+
+    EXPECT_TRUE(wait_child_success(pid));
+    EXPECT_EQ(received, kMessageCount);
+    EXPECT_TRUE(buf->empty());
+}
+
+TEST_F(ShmChannelCrossProcessTest, ConsumerChildProducerParentFullIntegrity) {
+    // Symmetric variant: consumer in the child process, producer in the
+    // parent — verifies the channel doesn't depend on whether the creator
+    // or the attacher acts as producer/consumer; the SPSC contract is
+    // defined by the actual call pattern, not by role().
+    const auto   name = unique_shm_name("xproc_swap_roles");
+    ShmNameGuard guard{name};
+
+    constexpr std::uint64_t kMessageCount = 200'000;
+
+    Channel parent_channel = Channel::create(name);
+    ASSERT_TRUE(parent_channel.is_valid());
+
+    pid_t pid = ::fork();
+    ASSERT_NE(pid, -1) << "fork failed: " << std::strerror(errno);
+
+    if (pid == 0) {
+        // --- Child process: consumer ---
+        Channel child_channel = Channel::attach(name);
+        if (!child_channel.is_valid())
+            _exit(1);
+
+        auto*         buf          = child_channel.buffer();
+        std::uint64_t expected_seq = 0;
+        std::uint64_t received     = 0;
+        const auto    deadline     = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+
+        while (received < kMessageCount) {
+            OrderMsg out{};
+            if (buf->pop(out)) {
+                if (!out.is_internally_consistent())
+                    _exit(2);
+                if (out.seq != expected_seq)
+                    _exit(3);
+                ++expected_seq;
+                ++received;
+            } else {
+                if (std::chrono::steady_clock::now() >= deadline)
+                    _exit(4);
+                std::this_thread::yield();
+            }
+        }
+        _exit(buf->empty() ? 0 : 5);
+    }
+
+    // --- Parent process: producer ---
+    auto* buf = parent_channel.buffer();
+    for (std::uint64_t seq = 0; seq < kMessageCount; ++seq) {
+        OrderMsg msg = OrderMsg::make(seq);
+        while (!buf->push(msg)) {
+            std::this_thread::yield();
+        }
+    }
+
+    EXPECT_TRUE(wait_child_success(pid));
+}
+
+TEST_F(ShmChannelCrossProcessTest, NoDuplicationNoLossUnderBurstyBackpressure) {
+    // The producer deliberately "bursts": rapidly saturates the buffer,
+    // then pauses, simulating bursts of market data followed by a
+    // consumer stall (GC pause / OS preemption / syscall latency spike —
+    // a typical HFT hazard). Verify that under this alternating load, no
+    // message is ever lost or duplicated.
+    const auto   name = unique_shm_name("xproc_bursty");
+    ShmNameGuard guard{name};
+
+    constexpr std::uint64_t kMessageCount = 50'000;
+
+    Channel parent_channel = Channel::create(name);
+    ASSERT_TRUE(parent_channel.is_valid());
+
+    pid_t pid = ::fork();
+    ASSERT_NE(pid, -1);
+
+    if (pid == 0) {
+        Channel child_channel = Channel::attach(name);
+        if (!child_channel.is_valid())
+            _exit(1);
+        auto* buf = child_channel.buffer();
+
+        std::mt19937_64 rng{0xC0FFEEu};
+        for (std::uint64_t seq = 0; seq < kMessageCount; ++seq) {
+            OrderMsg msg = OrderMsg::make(seq);
+            while (!buf->push(msg))
+                std::this_thread::yield();
+
+            // Periodically simulate a burst: a run with no pauses,
+            // followed by a random micro-pause giving the consumer a
+            // chance to fall behind.
+            if (rng() % 4096 == 0) {
+                std::this_thread::sleep_for(std::chrono::microseconds(200));
+            }
+        }
+        _exit(0);
+    }
+
+    auto*                             buf = parent_channel.buffer();
+    std::unordered_set<std::uint64_t> seen;
+    seen.reserve(kMessageCount);
+
+    std::uint64_t received = 0;
+    const auto    deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+
+    while (received < kMessageCount) {
+        OrderMsg out{};
+        if (buf->pop(out)) {
+            ASSERT_TRUE(out.is_internally_consistent());
+            auto [it, inserted] = seen.insert(out.seq);
+            ASSERT_TRUE(inserted) << "duplicate message observed for seq=" << out.seq;
+            ++received;
+        } else {
+            ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "stalled at received=" << received;
+            std::this_thread::yield();
+        }
+    }
+
+    EXPECT_TRUE(wait_child_success(pid));
+    EXPECT_EQ(seen.size(), kMessageCount);
+    // Every expected seq in [0, kMessageCount) must be present exactly
+    // once (no gaps).
+    for (std::uint64_t seq = 0; seq < kMessageCount; ++seq) {
+        ASSERT_TRUE(seen.contains(seq)) << "missing seq=" << seq;
+    }
+}
+
+TEST_F(ShmChannelCrossProcessTest, MultipleAttachersCanReadIndependentlyIsNotMPSC) {
+    // Documenting test: SPSCBuffer is NOT designed for multiple
+    // simultaneous consumers (single-consumer contract). Here we do not
+    // verify "correct concurrent operation of multiple consumers" (that's
+    // outside the contract) — we verify that attach() itself technically
+    // allows several processes to connect to the segment without
+    // crashing. Enforcing SPSC discipline is the API user's
+    // responsibility. This test documents the current behavior of
+    // multiple attaches succeeding without memory corruption in this
+    // particular scenario (no concurrent racing between the attachers),
+    // rather than driving them concurrently.
+    const auto   name = unique_shm_name("xproc_multi_attach");
+    ShmNameGuard guard{name};
+
+    Channel creator = Channel::create(name);
+    ASSERT_TRUE(creator.is_valid());
+
+    pid_t pid1 = ::fork();
+    ASSERT_NE(pid1, -1);
+    if (pid1 == 0) {
+        Channel a = Channel::attach(name);
+        _exit(a.is_valid() ? 0 : 1);
+    }
+    pid_t pid2 = ::fork();
+    ASSERT_NE(pid2, -1);
+    if (pid2 == 0) {
+        Channel b = Channel::attach(name);
+        _exit(b.is_valid() ? 0 : 1);
+    }
+
+    EXPECT_TRUE(wait_child_success(pid1));
+    EXPECT_TRUE(wait_child_success(pid2));
+}
