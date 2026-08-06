@@ -47,12 +47,7 @@ class SPSCShmChannel {
 
         std::byte* shm_start{static_cast<std::byte*>(mmap_result)};
 
-        add_madvise(shm_start);
-
-        if (::mlock(shm_start, shm_size_) != 0) {
-            std::print(stderr, "[FATAL] Cannot lock virtual address space into RAM. ERRNO: {}\n", std::strerror(errno));
-            std::abort();
-        }
+        setup_memory(shm_start);
 
         Buffer* buffer{new (shm_start) Buffer{}};
 
@@ -84,12 +79,7 @@ class SPSCShmChannel {
 
         std::byte* shm_start{static_cast<std::byte*>(mmap_result)};
 
-        add_madvise(shm_start);
-
-        if (::mlock(shm_start, shm_size_) != 0) {
-            std::print(stderr, "[FATAL] Cannot lock virtual address space into RAM. ERRNO: {}\n", std::strerror(errno));
-            std::abort();
-        }
+        setup_memory(shm_start);
 
         Buffer* buffer{reinterpret_cast<Buffer*>(shm_start)};
 
@@ -146,7 +136,7 @@ class SPSCShmChannel {
                             bool        is_creator = 0)
         : obj_name_{std::move(obj_name)}, shm_start_{shm_start}, buffer_{buffer}, is_creator_{is_creator} {}
 
-    static void add_madvise(std::byte* shm_start) noexcept {
+    static void setup_memory(std::byte* shm_start) noexcept {
         if (::madvise(shm_start, shm_size_, MADV_SEQUENTIAL) != 0)
             std::print(stderr,
                        "[WARN] madvise with MADV_SEQUENTIAL in "
@@ -162,6 +152,11 @@ class SPSCShmChannel {
                        "[WARN] madvise with MADV_HUGEPAGE in SPSCShmChannel::create "
                        "function failed. ERRNO: {}\n",
                        std::strerror(errno));
+
+        if (::mlock(shm_start, shm_size_) != 0) {
+            std::print(stderr, "[FATAL] Cannot lock virtual address space into RAM. ERRNO: {}\n", std::strerror(errno));
+            std::abort();
+        }
     }
 
     std::string                  obj_name_{""};
