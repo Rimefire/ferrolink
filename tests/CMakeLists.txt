@@ -51,6 +51,6 @@ function(ferrolink_add_test test_name source_file)
 endfunction()
 
 # Test binaries
-ferrolink_add_test(test_shm_region  test_shm_region.cpp)
+ferrolink_add_test(test_shm_region  test_shm_channel.cpp)
 ferrolink_add_test(test_spsc        test_spsc.cpp)
 ferrolink_add_test(test_transport   test_transport.cpp)
