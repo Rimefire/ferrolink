@@ -698,3 +698,107 @@ TEST(ShmChannelPingPongTest, RequestResponseRoundTripAcrossProcesses) {
 
     EXPECT_TRUE(wait_child_success(pid));
 }
+
+// In-process threaded tests — a fast SPSC visibility sanity-check
+// without the overhead of fork(). Useful as a smoke test before the
+// heavier cross-process scenarios, and for sanitizers (TSAN cannot
+// instrument other processes, but it can instrument std::thread).
+TEST(ShmChannelThreadedSmokeTest, ProducerConsumerThreadsNoLossNoCorruption) {
+    using Channel = SPSCShmChannel<OrderMsg, 256>;
+
+    const auto   name = unique_shm_name("threaded_smoke");
+    ShmNameGuard guard{name};
+
+    Channel channel = Channel::create(name);
+    ASSERT_TRUE(channel.is_valid());
+    auto* buf = channel.buffer();
+
+    constexpr std::uint64_t kMessageCount = 500'000;
+    std::atomic<bool>       producer_done{false};
+
+    std::thread producer([&] {
+        for (std::uint64_t seq = 0; seq < kMessageCount; ++seq) {
+            OrderMsg msg = OrderMsg::make(seq);
+            while (!buf->push(msg))
+                std::this_thread::yield();
+        }
+        producer_done.store(true, std::memory_order_release);
+    });
+
+    std::thread consumer([&] {
+        std::uint64_t expected = 0;
+        while (expected < kMessageCount) {
+            OrderMsg out{};
+            if (buf->pop(out)) {
+                ASSERT_TRUE(out.is_internally_consistent());
+                ASSERT_EQ(out.seq, expected);
+                ++expected;
+            } else {
+                std::this_thread::yield();
+            }
+        }
+    });
+
+    producer.join();
+    consumer.join();
+
+    EXPECT_TRUE(producer_done.load(std::memory_order_acquire));
+    EXPECT_TRUE(buf->empty());
+}
+
+TEST(ShmChannelThreadedSmokeTest, FullEmptyBoundaryConsistentAtQuiescence) {
+    // On a minimal capacity (2), it's especially easy to hit an off-by-one
+    // in full()/empty(), since they're computed from the
+    // write_index-read_index difference during frequent boundary wraps.
+    //
+    // Important: full() and empty() each read read_index_/write_index_
+    // through TWO separate atomic loads, with no single consistent
+    // "snapshot" of the index pair. This means calling full() and empty()
+    // from a third, observer thread while producer/consumer are actively
+    // running is methodologically unsound: between the observer's two
+    // calls the buffer can legitimately transition from full to empty (or
+    // vice versa) — that's expected behavior for a concurrent SPSC, not a
+    // bug. The valid invariant is that full() and empty() are consistent
+    // only at quiescence (after joining all producer/consumer threads),
+    // and that is exactly what this test verifies, leaving the "live"
+    // race checks to the FIFO/wrap-around/cross-process tests above.
+    using Channel = SPSCShmChannel<std::uint32_t, 2>;
+
+    const auto   name = unique_shm_name("threaded_boundary");
+    ShmNameGuard guard{name};
+
+    Channel channel = Channel::create(name);
+    ASSERT_TRUE(channel.is_valid());
+    auto* buf = channel.buffer();
+
+    constexpr std::uint32_t kIterations = 200'000;
+
+    std::thread producer([&] {
+        for (std::uint32_t i = 0; i < kIterations; ++i) {
+            while (!buf->push(i))
+                std::this_thread::yield();
+        }
+    });
+    std::thread consumer([&] {
+        std::uint32_t expected = 0;
+        while (expected < kIterations) {
+            std::uint32_t out = 0;
+            if (buf->pop(out)) {
+                ASSERT_EQ(out, expected);
+                ++expected;
+            } else {
+                std::this_thread::yield();
+            }
+        }
+    });
+
+    producer.join();
+    consumer.join();
+
+    // At quiescence, after the buffer has been fully drained, empty()
+    // must be strictly true and full() strictly false — there is no race
+    // here anymore, both loads observe the final, stable index state.
+    EXPECT_TRUE(buf->empty());
+    EXPECT_FALSE(buf->full());
+    EXPECT_EQ(buf->filled_size(), 0u);
+}
