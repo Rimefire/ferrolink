@@ -1,10 +1,9 @@
 #pragma once
-#include "spsc_buffer.hpp"
-
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <ipc/spsc_buffer.hpp>
 #include <print>
 #include <string>
 #include <sys/mman.h>

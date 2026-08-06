@@ -1,10 +1,9 @@
 #pragma once
-#include "detail/cache_line.hpp"
-
 #include <array>
 #include <atomic>
 #include <concepts>
 #include <cstddef>
+#include <detail/cache_line.hpp>
 #include <type_traits>
 #include <utility>
 
