@@ -631,3 +631,70 @@ TEST_F(ShmChannelCrossProcessTest, MultipleAttachersCanReadIndependentlyIsNotMPS
     EXPECT_TRUE(wait_child_success(pid1));
     EXPECT_TRUE(wait_child_success(pid2));
 }
+
+// Stress/latency-oriented test: a single-element "ping-pong"
+// request/response over two independent shm channels between
+// processes — a typical HFT pattern (order request / ack). Verifies
+// there is no deadlock and correctness holds on a minimal buffer
+// (Capacity=1..2), where full/empty boundaries are hit as often as
+// possible.
+TEST(ShmChannelPingPongTest, RequestResponseRoundTripAcrossProcesses) {
+    using ReqChannel  = SPSCShmChannel<std::uint64_t, 2>;
+    using RespChannel = SPSCShmChannel<std::uint64_t, 2>;
+
+    const auto   req_name  = unique_shm_name("pingpong_req");
+    const auto   resp_name = unique_shm_name("pingpong_resp");
+    ShmNameGuard req_guard{req_name};
+    ShmNameGuard resp_guard{resp_name};
+
+    ReqChannel  req_channel  = ReqChannel::create(req_name);
+    RespChannel resp_channel = RespChannel::create(resp_name);
+    ASSERT_TRUE(req_channel.is_valid());
+    ASSERT_TRUE(resp_channel.is_valid());
+
+    constexpr std::uint64_t kRounds = 20'000;
+
+    pid_t pid = ::fork();
+    ASSERT_NE(pid, -1);
+
+    if (pid == 0) {
+        // --- Child process: "echo server" ---
+        ReqChannel  req  = ReqChannel::attach(req_name);
+        RespChannel resp = RespChannel::attach(resp_name);
+        if (!req.is_valid() || !resp.is_valid())
+            _exit(1);
+
+        std::uint64_t handled = 0;
+        while (handled < kRounds) {
+            std::uint64_t val = 0;
+            if (req.buffer()->pop(val)) {
+                std::uint64_t echoed = val * 2 + 1; // deterministic transform
+                while (!resp.buffer()->push(echoed))
+                    std::this_thread::yield();
+                ++handled;
+            } else {
+                std::this_thread::yield();
+            }
+        }
+        _exit(0);
+    }
+
+    // --- Parent: client ---
+    auto* req_buf  = req_channel.buffer();
+    auto* resp_buf = resp_channel.buffer();
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    for (std::uint64_t i = 0; i < kRounds; ++i) {
+        while (!req_buf->push(i))
+            std::this_thread::yield();
+
+        std::uint64_t response = 0;
+        while (!resp_buf->pop(response)) {
+            ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "ping-pong stalled at round " << i;
+            std::this_thread::yield();
+        }
+        ASSERT_EQ(response, i * 2 + 1) << "round-trip integrity violated at round " << i;
+    }
+
+    EXPECT_TRUE(wait_child_success(pid));
+}
