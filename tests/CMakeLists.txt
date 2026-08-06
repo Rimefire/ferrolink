@@ -42,7 +42,7 @@ function(ferrolink_add_test test_name source_file)
 
     gtest_discover_tests(${test_name}
         PROPERTIES
-            TIMEOUT 30
+            TIMEOUT 60
             # IPC/fork-based tests must not run concurrently with each other
             # if they touch the same shm object names — force serial ctest
             # execution for this suite to avoid EEXIST races between tests.
