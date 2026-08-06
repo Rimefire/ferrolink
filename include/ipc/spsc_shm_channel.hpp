@@ -1,9 +1,11 @@
 #pragma once
+#include <csignal>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <format>
 #include <ipc/spsc_buffer.hpp>
 #include <print>
 #include <string>
@@ -19,6 +21,11 @@ class SPSCShmChannel {
   public:
     using Buffer = spsc::SPSCBuffer<T, Capacity>;
     static SPSCShmChannel create(std::string obj_name) noexcept {
+        std::strncpy(shm_name_, ("/" + obj_name).c_str(), sizeof(shm_name_) - 1);
+
+        struct sigaction sig_act {};
+        register_signal_handlers(sig_act);
+
         int fd{open_shm(obj_name, O_CREAT | O_EXCL | O_RDWR)};
 
         auto cleanup{[&fd]() { ::close(fd); }};
@@ -108,8 +115,7 @@ class SPSCShmChannel {
 
     Buffer* buffer() noexcept { return buffer_; }
 
-    bool is_valid() const noexcept { return shm_start_ != nullptr && buffer_ != nullptr; }
-
+    bool               is_valid() const noexcept { return shm_start_ != nullptr && buffer_ != nullptr; };
     const std::string& name() const noexcept { return obj_name_; }
 
     std::size_t shm_size() const noexcept { return shm_size_; }
@@ -122,23 +128,20 @@ class SPSCShmChannel {
         : obj_name_{std::move(obj_name)}, shm_start_{shm_start}, buffer_{buffer}, is_creator_{is_creator} {}
 
     static void setup_memory(std::byte* shm_start) noexcept {
-        if (::madvise(shm_start, shm_size_, MADV_SEQUENTIAL) != 0)
-            std::print(stderr,
-                       "[WARN] madvise with MADV_SEQUENTIAL in "
-                       "SPSCShmChannel::setup_memory function failed. ERRNO: {}\n",
-                       std::strerror(errno));
-        if (::madvise(shm_start, shm_size_, MADV_WILLNEED) != 0)
-            std::print(stderr,
-                       "[WARN] madvise with MADV_WILLNEED in SPSCShmChannel::setup_memory "
-                       "function failed. ERRNO: {}\n",
-                       std::strerror(errno));
-        if (::madvise(shm_start, shm_size_, MADV_HUGEPAGE) != 0)
-            std::print(stderr,
-                       "[WARN] madvise with MADV_HUGEPAGE in SPSCBuffer::setup_memory failed. ERRNO: {}\n",
-                       std::strerror(errno));
+        static constexpr std::pair<int, const char*> flags[]{
+            {MADV_SEQUENTIAL, "MADV_SEQUENTIAL"},
+            {MADV_WILLNEED, "MADV_WILLNEED"},
+            {MADV_HUGEPAGE, "MADV_HUGEPAGE"},
+        };
 
-        if (::mlock(shm_start, shm_size_) != 0) {
-            std::print(stderr, "[FATAL] Cannot lock virtual address space into RAM. ERRNO: {}\n", std::strerror(errno));
+        for (const auto& [flagnum, name] : flags) {
+            checked_syscall([&] { return ::madvise(shm_start, shm_size_, flagnum); },
+                            std::format("madvise with {} in SPSCShmChannel::setup_memory function failed", name),
+                            "WARNING");
+        }
+
+        if (!checked_syscall(
+                [&] { return ::mlock(shm_start, shm_size_); }, "Cannot lock virtual address space into RAM", "FATAL")) {
             std::abort();
         }
     }
@@ -156,6 +159,40 @@ class SPSCShmChannel {
         return fd;
     }
 
+    static void sig_handler([[maybe_unused]] int sig) noexcept {
+        if (shm_name_[0] != '\0') {
+            ::shm_unlink(shm_name_);
+        }
+    }
+
+    static void register_signal_handlers(struct sigaction& sa) noexcept {
+        sa.sa_handler = sig_handler;
+        sa.sa_flags   = SA_RESETHAND;
+
+        if (!checked_syscall([&] { return ::sigemptyset(&sa.sa_mask); }, "Failed to initialize signal mask", "FATAL")) {
+            std::abort();
+        }
+
+        static constexpr int signals[] = {SIGABRT, SIGTERM, SIGSEGV, SIGINT};
+        for (int signum : signals) {
+            if (!checked_syscall([&] { return ::sigaction(signum, &sa, nullptr); },
+                                 std::format("Failed to register signal handler for signal {}", ::strsignal(signum)),
+                                 "FATAL")) {
+                std::abort();
+            }
+        }
+    }
+
+    template <typename Fn>
+    static bool checked_syscall(Fn&& fn, std::string& what, std::string& status) noexcept {
+        if (fn() != 0) {
+            std::print(stderr, "[{}] {}. ERRNO: {}", status, what, std::strerror(errno));
+            return false;
+        }
+        return true;
+    }
+
+    static char                  shm_name_[256];
     std::string                  obj_name_{""};
     static constexpr std::size_t shm_size_{sizeof(Buffer)};
     std::byte*                   shm_start_{nullptr};
