@@ -257,3 +257,43 @@ TEST_F(ShmChannelLifecycleTest, DifferentInstancesHaveIndependentNamesAfterCreat
     EXPECT_EQ(out1, 1);
     EXPECT_EQ(out2, 2);
 }
+
+// Contract violations — fatal by design (std::abort())
+//
+// These tests document that violating the contract (double-creating the
+// same object, attaching to a non-existent one) is NOT a recoverable
+// error, but a fatal abort. This matches the intended architecture ("by
+// design"); the test merely documents and guards this behavior against an
+// accidental regression to a "silent" failure mode.
+class ShmChannelDeathTest : public ::testing::Test {
+  protected:
+    using Channel = SPSCShmChannel<int, 16>;
+};
+
+TEST_F(ShmChannelDeathTest, CreateWithExistingNameAborts) {
+    const auto   name = unique_shm_name("double_create");
+    ShmNameGuard guard{name};
+
+    Channel first = Channel::create(name);
+    ASSERT_TRUE(first.is_valid());
+
+    EXPECT_DEATH(
+        {
+            Channel second = Channel::create(name); // O_CREAT|O_EXCL must fail -> abort
+            (void) second;
+        },
+        "");
+}
+
+TEST_F(ShmChannelDeathTest, AttachToNonexistentNameAborts) {
+    const auto name = unique_shm_name("attach_missing");
+    // Explicitly guarantee that the segment does not exist.
+    ::shm_unlink(("/" + name).c_str());
+
+    EXPECT_DEATH(
+        {
+            Channel ch = Channel::attach(name);
+            (void) ch;
+        },
+        "");
+}
