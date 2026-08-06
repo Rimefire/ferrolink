@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
@@ -9,7 +10,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <cstdio
 #include <utility>
 
 namespace ferrolink::ipc::shm_channel {
