@@ -802,3 +802,19 @@ TEST(ShmChannelThreadedSmokeTest, FullEmptyBoundaryConsistentAtQuiescence) {
     EXPECT_FALSE(buf->full());
     EXPECT_EQ(buf->filled_size(), 0u);
 }
+
+// Resource hygiene: bare name (no leading "/") in the public API (the
+// class prepends "/" to the POSIX name internally), and correct
+// handling of name-length edge cases.
+TEST(ShmChannelNamingTest, PlainNameWithoutLeadingSlashRoundTrips) {
+    using Channel     = SPSCShmChannel<int, 4>;
+    const auto   name = unique_shm_name("naming");
+    ShmNameGuard guard{name};
+
+    Channel ch = Channel::create(name);
+    ASSERT_TRUE(ch.is_valid());
+    EXPECT_EQ(ch.name(), name);
+    EXPECT_EQ(ch.name().front(), 'f') << "API expects bare object name; leading '/' is added internally";
+}
+
+} // namespace ferrolink::ipc::shm::test
