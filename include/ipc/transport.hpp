@@ -36,6 +36,8 @@ class TransportProducer {
   private:
     explicit TransportProducer(ChannelType&& channel) noexcept : channel_{std::move(channel)} {}
 
+    friend class Transport;
+
     ChannelType channel_;
 };
 
@@ -47,6 +49,22 @@ class TransportConsumer {
 
   private:
     ChannelType channel_{};
+};
+
+template <typename ChannelType, typename MessageType>
+    requires Channel<ChannelType, MessageType>
+class Transport {
+  public:
+    static auto create(std::string name) noexcept -> TransportProducer<ChannelType, MessageType>;
+    static auto attach(std::string name) noexcept -> TransportConsumer<ChannelType, MessageType>;
+
+    Transport() = delete;
+
+    Transport(const Transport&)            = delete;
+    Transport& operator=(const Transport&) = delete;
+
+    Transport(Transport&&)            = delete;
+    Transport& operator=(Transport&&) = delete;
 };
 
 } // namespace ferrolink::ipc::transport
