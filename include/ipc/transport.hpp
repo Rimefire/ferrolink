@@ -27,8 +27,16 @@ class TransportProducer {
   public:
     bool try_send(const MessageType& message) noexcept;
 
+    TransportProducer(const TransportProducer&)            = delete;
+    TransportProducer& operator=(const TransportProducer&) = delete;
+
+    TransportProducer(TransportProducer&&)          = delete;
+    TransportProducer& operator=(TransportProducer) = delete;
+
   private:
-    ChannelType channel_{};
+    explicit TransportProducer(ChannelType&& channel) noexcept : channel_{std::move(channel)} {}
+
+    ChannelType channel_;
 };
 
 template <typename ChannelType, typename MessageType>
@@ -40,32 +48,6 @@ class TransportConsumer {
   private:
     ChannelType channel_{};
 };
-
-template <typename ChannelType, typename MessageType>
-    requires Channel<ChannelType, MessageType>
-class Transport {
-    static auto create(std::string name) -> TransportProducer<ChannelType, MessageType>;
-
-    static auto attach(std::string name) -> TransportConsumer<ChannelType, MessageType>;
-
-    Transport() = delete;
-
-    Transport(const Transport&)            = delete;
-    Transport& operator=(const Transport&) = delete;
-
-    Transport(Transport&&)            = delete;
-    Transport& operator=(Transport&&) = delete;
-
-    ~Transport() noexcept = default;
-};
-
-template <typename ChannelType, typename MessageType>
-    requires Channel<ChannelType, MessageType>
-auto create(std::string name) -> TransportProducer<ChannelType, MessageType>;
-
-template <typename ChannelType, typename MessageType>
-    requires Channel<ChannelType, MessageType>
-auto attach(std::string name) -> TransportConsumer<ChannelType, MessageType>;
 
 } // namespace ferrolink::ipc::transport
 
