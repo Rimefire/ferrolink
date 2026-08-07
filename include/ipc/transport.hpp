@@ -83,4 +83,4 @@ class Transport {
 
 } // namespace ferrolink::ipc::transport
 
-#include <ipc/transport.hpp>
+#include <ipc/transport.inl>
