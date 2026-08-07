@@ -36,6 +36,8 @@ class TransportProducer {
   private:
     explicit TransportProducer(ChannelType&& channel) noexcept : channel_{std::move(channel)} {}
 
+    template <typename C, typename M>
+        requires Channel<C, M>
     friend class Transport;
 
     ChannelType channel_;
@@ -48,7 +50,13 @@ class TransportConsumer {
     bool try_recv(MessageType& out) noexcept;
 
   private:
-    ChannelType channel_{};
+    explicit TransportConsumer(ChannelType&& channel) noexcept : channel_{std::move(channel)} {}
+
+    template <typename C, typename M>
+        requires Channel<C, M>
+    friend class Transport;
+
+    ChannelType channel_;
 };
 
 template <typename ChannelType, typename MessageType>
