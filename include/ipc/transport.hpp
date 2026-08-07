@@ -30,8 +30,8 @@ class TransportProducer {
     TransportProducer(const TransportProducer&)            = delete;
     TransportProducer& operator=(const TransportProducer&) = delete;
 
-    TransportProducer(TransportProducer&&)          = delete;
-    TransportProducer& operator=(TransportProducer) = delete;
+    TransportProducer(TransportProducer&&)            = delete;
+    TransportProducer& operator=(TransportProducer&&) = delete;
 
   private:
     explicit TransportProducer(ChannelType&& channel) noexcept : channel_{std::move(channel)} {}
