@@ -13,7 +13,7 @@ namespace ferrolink::ipc::transport {
 
     template <typename ChannelType, typename MessageType>
         requires Channel<ChannelType, MessageType>
-    auto Transport<ChannelType, MessageType>::create(std::string name) -> TransportProducer<ChannelType, MessageType> {
+    auto Transport<ChannelType, MessageType>::create(std::string name) noexcept -> TransportProducer<ChannelType, MessageType> {
         ChannelType channel{ChannelType::create(std::move(name))};
 
         if (!channel.is_valid()) {
