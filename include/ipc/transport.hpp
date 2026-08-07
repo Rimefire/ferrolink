@@ -49,6 +49,12 @@ class TransportConsumer {
   public:
     bool try_recv(MessageType& out) noexcept;
 
+    TransportConsumer(const TransportConsumer&)            = delete;
+    TransportConsumer& operator=(const TransportConsumer&) = delete;
+
+    TransportConsumer(TransportConsumer&&)            = delete;
+    TransportConsumer& operator=(TransportConsumer&&) = delete;
+
   private:
     explicit TransportConsumer(ChannelType&& channel) noexcept : channel_{std::move(channel)} {}
 
