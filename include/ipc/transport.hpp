@@ -34,7 +34,12 @@ class TransportProducer {
     TransportProducer& operator=(TransportProducer&&) = delete;
 
   private:
-    explicit TransportProducer(ChannelType&& channel) noexcept : channel_{std::move(channel)} {}
+    explicit TransportProducer(ChannelType&& channel) noexcept : channel_{std::move(channel)} {
+        if (!channel_.is_valid()) {
+            std::print(stderr, "[FATAL] Producer channel is not valid.\n");
+            std::abort();
+        }
+    }
 
     template <typename C, typename M>
         requires Channel<C, M>
@@ -56,7 +61,12 @@ class TransportConsumer {
     TransportConsumer& operator=(TransportConsumer&&) = delete;
 
   private:
-    explicit TransportConsumer(ChannelType&& channel) noexcept : channel_{std::move(channel)} {}
+    explicit TransportConsumer(ChannelType&& channel) noexcept : channel_{std::move(channel)} {
+        if (!channel_.is_valid()) {
+            std::print(stderr, "[FATAL] Consumer channel is not valid.\n");
+            std::abort();
+        }
+    }
 
     template <typename C, typename M>
         requires Channel<C, M>
