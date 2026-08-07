@@ -184,7 +184,7 @@ class SPSCShmChannel {
     }
 
     template <typename Fn>
-    static bool checked_syscall(Fn&& fn, std::string& what, std::string& status) noexcept {
+    static bool checked_syscall(Fn&& fn, const std::string& what, const std::string& status) noexcept {
         if (fn() != 0) {
             std::print(stderr, "[{}] {}. ERRNO: {}", status, what, std::strerror(errno));
             return false;
