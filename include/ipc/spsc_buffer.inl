@@ -26,7 +26,7 @@ std::size_t SPSCBuffer<T, Capacity>::filled_size() const noexcept {
 
 template <typename T, std::size_t Capacity>
     requires TriviallyCopyable<T>
-bool SPSCBuffer<T, Capacity>::push(T value) noexcept {
+bool SPSCBuffer<T, Capacity>::push(const T& value) noexcept {
     const auto curr_write_idx{write_index_.load(std::memory_order_relaxed)};
     const auto curr_read_idx{read_index_.load(std::memory_order_acquire)};
 
