@@ -3,7 +3,7 @@ namespace ferrolink::ipc::spsc {
 template <typename T, std::size_t Capacity>
     requires TriviallyCopyable<T>
 constexpr std::size_t SPSCBuffer<T, Capacity>::capacity() noexcept {
-        return Capacity;
+    return Capacity;
 }
 
 template <typename T, std::size_t Capacity>
@@ -30,10 +30,11 @@ bool SPSCBuffer<T, Capacity>::push(const T& value) noexcept {
     const auto curr_write_idx{write_index_.load(std::memory_order_relaxed)};
     const auto curr_read_idx{read_index_.load(std::memory_order_acquire)};
 
-    if (curr_write_idx - curr_read_idx == Capacity) return false;
+    if (curr_write_idx - curr_read_idx == Capacity)
+        return false;
 
     slots_[curr_write_idx & mask_] = value;
-    
+
     write_index_.store(curr_write_idx + 1, std::memory_order_release);
 
     return true;
@@ -45,11 +46,12 @@ bool SPSCBuffer<T, Capacity>::pop(T& out) noexcept {
     const auto curr_read_idx{read_index_.load(std::memory_order_relaxed)};
     const auto curr_write_idx{write_index_.load(std::memory_order_acquire)};
 
-    if (curr_write_idx == curr_read_idx) return false;
+    if (curr_write_idx == curr_read_idx)
+        return false;
 
     out = slots_[curr_read_idx & mask_];
 
     read_index_.store(curr_read_idx + 1, std::memory_order_release);
     return true;
 }
-}
+} // namespace ferrolink::ipc::spsc
