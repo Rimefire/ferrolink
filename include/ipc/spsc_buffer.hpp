@@ -27,7 +27,7 @@ class SPSCBuffer {
     SPSCBuffer(SPSCBuffer&& other)            = delete;
     SPSCBuffer& operator=(SPSCBuffer&& other) = delete;
 
-    bool push(T value) noexcept;
+    bool push(const T& value) noexcept;
 
     bool pop(T& out) noexcept;
 
