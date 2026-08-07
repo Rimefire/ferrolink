@@ -33,7 +33,13 @@ class TransportProducer {
 
 template <typename ChannelType, typename MessageType>
     requires Channel<ChannelType, MessageType>
-class TransportConsumer {};
+class TransportConsumer {
+  public:
+    bool try_recv(MessageType& out) noexcept;
+
+  private:
+    ChannelType channel_{};
+};
 
 template <typename ChannelType, typename MessageType>
     requires Channel<ChannelType, MessageType>
