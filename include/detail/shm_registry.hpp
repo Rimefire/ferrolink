@@ -1,8 +1,10 @@
 #pragma once
 #include <array>
 #include <bit>
+#include <cerrno>
 #include <csignal>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
 #include <print>
