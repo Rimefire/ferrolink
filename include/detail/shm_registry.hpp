@@ -55,6 +55,8 @@ inline void ensure_signal_handlers_registered() noexcept {
             std::abort();
         }
     }
+
+    handlers_reg = true;
 }
 
 inline std::size_t register_name(const char* name) noexcept {
