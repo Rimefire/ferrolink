@@ -6,6 +6,7 @@
 #include <print>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 namespace ferrolink::ipc::transport {
 template <typename Buff, typename Message>
