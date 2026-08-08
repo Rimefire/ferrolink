@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <bit>
 #include <csignal>
 #include <cstdio>
 #include <cstring>
@@ -42,7 +43,7 @@ inline void ensure_signal_handlers_registered() noexcept {
         std::abort();
     }
 
-    sig_act.sa_flags = SA_RESETHAND;
+    sig_act.sa_flags = static_cast<int>(SA_RESETHAND);
 
     static constexpr int signals[]{SIGABRT, SIGTERM, SIGSEGV, SIGINT};
     for (int signum : signals) {
