@@ -1,6 +1,9 @@
 #pragma once
 
 #include <concepts>
+#include <cstdio>
+#include <cstdlib>
+#include <print>
 #include <string>
 #include <type_traits>
 
