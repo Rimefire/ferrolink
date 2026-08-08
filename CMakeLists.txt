@@ -158,32 +158,15 @@ target_include_directories(ferrolink_ipc INTERFACE
 
 target_link_libraries(ferrolink_ipc INTERFACE ferrolink::options)
 
-# transport.cpp/.hpp are compiled (non-header-only) — build them as a
-# separate static library and link it into the interface target so both
-# header-only and compiled parts are pulled in by a single ferrolink::ipc.
-add_library(ferrolink_ipc_impl STATIC
-    src/transport.cpp
-)
-add_library(ferrolink::ipc_impl ALIAS ferrolink_ipc_impl)
-
-target_include_directories(ferrolink_ipc_impl PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-
-target_link_libraries(ferrolink_ipc_impl PUBLIC ferrolink::options)
-
-target_link_libraries(ferrolink_ipc INTERFACE ferrolink::ipc_impl)
-
 # rt is required on some glibc versions for shm_open/shm_unlink;
 # pthread is required for std::atomic wait/notify and thread support.
 find_library(FERROLINK_RT_LIBRARY rt)
 if(FERROLINK_RT_LIBRARY)
-    target_link_libraries(ferrolink_ipc_impl PUBLIC ${FERROLINK_RT_LIBRARY})
+    target_link_libraries(ferrolink_ipc INTERFACE ${FERROLINK_RT_LIBRARY})
 endif()
 
 find_package(Threads REQUIRED)
-target_link_libraries(ferrolink_ipc_impl PUBLIC Threads::Threads)
+target_link_libraries(ferrolink_ipc INTERFACE Threads::Threads)
 
 # Tests
 if(FERROLINK_BUILD_TESTS)
