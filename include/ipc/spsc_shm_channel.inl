@@ -2,10 +2,8 @@ namespace ferrolink::ipc::shm_channel {
 template <typename T, std::size_t Capacity>
     requires spsc::TriviallyCopyable<T>
 SPSCShmChannel<T, Capacity> SPSCShmChannel<T, Capacity>::create(std::string obj_name) noexcept {
-    std::strncpy(shm_name_, ("/" + obj_name).c_str(), sizeof(shm_name_) - 1);
-
-    struct sigaction sig_act {};
-    register_signal_handlers(sig_act);
+    detail::shm_registry::ensure_signal_handlers_registered();
+    std::size_t registry_slot{detail::shm_registry::register_name(("/" + obj_name).c_str())};
 
     int fd{open_shm(obj_name, O_CREAT | O_EXCL | O_RDWR)};
 
@@ -32,12 +30,14 @@ SPSCShmChannel<T, Capacity> SPSCShmChannel<T, Capacity>::create(std::string obj_
 
     Buffer* buffer{new (shm_start) Buffer{}};
 
-    return SPSCShmChannel(shm_start, buffer, std::move(obj_name), 1);
+    return SPSCShmChannel(shm_start, buffer, std::move(obj_name), registry_slot, 1);
 }
 
 template <typename T, std::size_t Capacity>
     requires spsc::TriviallyCopyable<T>
 SPSCShmChannel<T, Capacity> SPSCShmChannel<T, Capacity>::attach(std::string obj_name) noexcept {
+    detail::shm_registry::ensure_signal_handlers_registered();
+
     int fd{open_shm(obj_name, O_RDWR)};
 
     auto cleanup{[&fd]() { ::close(fd); }};
@@ -58,7 +58,7 @@ SPSCShmChannel<T, Capacity> SPSCShmChannel<T, Capacity>::attach(std::string obj_
 
     Buffer* buffer{reinterpret_cast<Buffer*>(shm_start)};
 
-    return SPSCShmChannel(shm_start, buffer, std::move(obj_name), 0);
+    return SPSCShmChannel(shm_start, buffer, std::move(obj_name), 0, 0);
 }
 
 template <typename T, std::size_t Capacity>
@@ -94,34 +94,6 @@ int SPSCShmChannel<T, Capacity>::open_shm(const std::string& name, int flags) no
     }
 
     return fd;
-}
-
-template <typename T, std::size_t Capacity>
-    requires spsc::TriviallyCopyable<T>
-void SPSCShmChannel<T, Capacity>::sig_handler([[maybe_unused]] int sig) noexcept {
-    if (shm_name_[0] != '\0') {
-        ::shm_unlink(shm_name_);
-    }
-}
-
-template <typename T, std::size_t Capacity>
-    requires spsc::TriviallyCopyable<T>
-void SPSCShmChannel<T, Capacity>::register_signal_handlers(struct sigaction& sa) noexcept {
-    sa.sa_handler = sig_handler;
-    sa.sa_flags   = SA_RESETHAND;
-
-    if (!checked_syscall([&] { return ::sigemptyset(&sa.sa_mask); }, "Failed to initialize signal mask", "FATAL")) {
-        std::abort();
-    }
-
-    static constexpr int signals[] = {SIGABRT, SIGTERM, SIGSEGV, SIGINT};
-    for (int signum : signals) {
-        if (!checked_syscall([&] { return ::sigaction(signum, &sa, nullptr); },
-                             std::format("Failed to register signal handler for signal {}", ::strsignal(signum)),
-                             "FATAL")) {
-            std::abort();
-        }
-    }
 }
 
 template <typename T, std::size_t Capacity>
