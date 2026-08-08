@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cerrno>
 #include <concepts>
 #include <cstdio>
 #include <cstdlib>
