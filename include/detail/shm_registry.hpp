@@ -10,7 +10,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-namespace ferrolink::ipc::detail::shm_registry {
+namespace ferrolink::detail::shm_registry {
 namespace {
 struct Slot {
     char shm_name[256]{};
@@ -21,7 +21,7 @@ inline constexpr std::size_t          kMaxChannels{32};
 inline bool                           handlers_reg{false};
 inline std::array<Slot, kMaxChannels> registry{};
 
-void sig_handler([[maybe_unused]] int sig) noexcept {
+inline void sig_handler([[maybe_unused]] int sig) noexcept {
     for (auto& slot : registry) {
         if (slot.in_use) {
             ::shm_unlink(slot.shm_name);
@@ -30,7 +30,7 @@ void sig_handler([[maybe_unused]] int sig) noexcept {
 }
 } // namespace
 
-void ensure_signal_handlers_registered() noexcept {
+inline void ensure_signal_handlers_registered() noexcept {
     if (handlers_reg)
         return;
 
@@ -56,7 +56,7 @@ void ensure_signal_handlers_registered() noexcept {
     }
 }
 
-std::size_t register_name(const char* name) noexcept {
+inline std::size_t register_name(const char* name) noexcept {
     for (std::size_t slot{}; slot < registry.size(); ++slot) {
         if (!registry[slot].in_use) {
             std::strncpy(registry[slot].shm_name, name, sizeof(registry[slot].shm_name) - 1);
@@ -71,7 +71,7 @@ std::size_t register_name(const char* name) noexcept {
     std::abort();
 }
 
-void unregister(std::size_t slot) noexcept {
+inline void unregister(std::size_t slot) noexcept {
     if (slot >= registry.size()) {
         std::print(stderr, "[WARN] Slot number is greater than registry size");
         return;
@@ -85,4 +85,4 @@ void unregister(std::size_t slot) noexcept {
     std::memset(registry[slot].shm_name, 0, sizeof(registry[slot].shm_name));
     registry[slot].in_use = false;
 }
-} // namespace ferrolink::ipc::detail::shm_registry
+} // namespace ferrolink::detail::shm_registry
