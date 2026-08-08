@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <detail/shm_registry.hpp>
 #include <fcntl.h>
 #include <format>
 #include <ipc/spsc_buffer.hpp>
@@ -28,6 +29,7 @@ class SPSCShmChannel {
 
     friend void swap(SPSCShmChannel<T, Capacity>& src, SPSCShmChannel<T, Capacity>& dest) noexcept {
         std::swap(src.obj_name_, dest.obj_name_);
+        std::swap(src.registry_slot_, dest.registry_slot_);
         std::swap(src.shm_start_, dest.shm_start_);
         std::swap(src.buffer_, dest.buffer_);
         std::swap(src.is_creator_, dest.is_creator_);
@@ -50,6 +52,7 @@ class SPSCShmChannel {
             if (is_creator_) {
                 if (::shm_unlink(("/" + obj_name_).c_str()) != 0)
                     std::print(stderr, "[WARN] shm_unlink failed. ERRNO: {}\n", std::strerror(errno));
+                detail::shm_registry::unregister(registry_slot_);
             }
         }
     }
@@ -66,24 +69,22 @@ class SPSCShmChannel {
     std::size_t shm_size() const noexcept { return shm_size_; }
 
   private:
-    explicit SPSCShmChannel(std::byte*  shm_start  = nullptr,
-                            Buffer*     buffer     = nullptr,
-                            std::string obj_name   = "",
-                            bool        is_creator = 0)
-        : obj_name_{std::move(obj_name)}, shm_start_{shm_start}, buffer_{buffer}, is_creator_{is_creator} {}
+    explicit SPSCShmChannel(std::byte*  shm_start     = nullptr,
+                            Buffer*     buffer        = nullptr,
+                            std::string obj_name      = "",
+                            std::size_t registry_slot = 0,
+                            bool        is_creator    = 0)
+        : obj_name_{std::move(obj_name)}, registry_slot_{registry_slot}, shm_start_{shm_start}, buffer_{buffer},
+          is_creator_{is_creator} {}
 
     static void setup_memory(std::byte* shm_start) noexcept;
     static int  open_shm(const std::string& name, int flags) noexcept;
-
-    static void sig_handler([[maybe_unused]] int sig) noexcept;
-    static void register_signal_handlers(struct sigaction& sa) noexcept;
-
     template <typename Fn>
     static bool checked_syscall(Fn&& fn, const std::string& what, const std::string& status) noexcept;
 
-    static char                  shm_name_[256];
     std::string                  obj_name_{""};
     static constexpr std::size_t shm_size_{sizeof(Buffer)};
+    std::size_t                  registry_slot_{0};
     std::byte*                   shm_start_{nullptr};
     Buffer*                      buffer_{nullptr};
     bool                         is_creator_{false};

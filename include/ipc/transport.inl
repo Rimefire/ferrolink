@@ -20,7 +20,8 @@ auto Transport<ChannelType, MessageType>::create(std::string name) noexcept
 
 template <typename ChannelType, typename MessageType>
     requires Channel<ChannelType, MessageType>
-auto Transport<ChannelType, MessageType>::attach(std::string name) noexcept -> TransportConsumer<ChannelType, MessageType> {
+auto Transport<ChannelType, MessageType>::attach(std::string name) noexcept
+    -> TransportConsumer<ChannelType, MessageType> {
     return TransportConsumer<ChannelType, MessageType>{ChannelType::attach(std::move(name))};
 }
 } // namespace ferrolink::ipc::transport
