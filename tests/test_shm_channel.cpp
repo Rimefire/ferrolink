@@ -17,7 +17,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace ferrolink::ipc::shm::test {
+namespace ferrolink::ipc::shm_channel::test {
 
 using ferrolink::ipc::shm_channel::SPSCShmChannel;
 // Helper types
@@ -816,4 +816,4 @@ TEST(ShmChannelNamingTest, PlainNameWithoutLeadingSlashRoundTrips) {
     EXPECT_EQ(ch.name().front(), 'f') << "API expects bare object name; leading '/' is added internally";
 }
 
-} // namespace ferrolink::ipc::shm::test
+} // namespace ferrolink::ipc::shm_channel::test
