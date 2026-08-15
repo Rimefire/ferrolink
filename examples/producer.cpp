@@ -20,9 +20,10 @@
 // that object to already exist and aborts if it doesn't. This mirrors the
 // real requirement documented on SPSCShmChannel::attach().
 
+#include "market_tick.hpp"
+
 #include <atomic>
 #include <chrono>
-#include <common/market_tick.hpp>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -140,6 +141,12 @@ MarketTick make_tick(std::uint64_t seq) noexcept {
 }
 
 } // namespace ferrolink::examples::producer
+
+// main() must stay in the global namespace to remain a valid program entry
+// point — a linker looks for a global `::main`, not a namespaced one. Pull
+// in everything the producer namespace defined above instead of qualifying
+// every single name here.
+using namespace ferrolink::examples::producer;
 
 int main(int argc, char** argv) {
     Options opts = parse_args(argc, argv);

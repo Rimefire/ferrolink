@@ -20,9 +20,10 @@
 // producer hasn't created it yet. If you see an abort on startup, that's
 // almost certainly why; start producer first and try again.
 
+#include "market_tick.hpp"
+
 #include <atomic>
 #include <chrono>
-#include <common/market_tick.hpp>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -105,6 +106,12 @@ Options parse_args(int argc, char** argv) {
 }
 
 } // namespace ferrolink::examples::consumer
+
+// main() must stay in the global namespace to remain a valid program entry
+// point — a linker looks for a global `::main`, not a namespaced one. Pull
+// in everything the consumer namespace defined above instead of qualifying
+// every single name here.
+using namespace ferrolink::examples::consumer;
 
 int main(int argc, char** argv) {
     Options opts = parse_args(argc, argv);
