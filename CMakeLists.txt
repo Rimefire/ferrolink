@@ -1,7 +1,12 @@
+# Copyright (c) 2026-present Rimefire. All rights reserved.
+# Proprietary and confidential — unauthorized copying, distribution, or use
+# of this file, via any medium, is strictly prohibited. See LICENSE at the
+# repository root.
+
 cmake_minimum_required(VERSION 3.25)
 
 project(ferrolink
-    VERSION 0.3.0
+    VERSION 1.0.0
     DESCRIPTION "Low-latency SPSC shared-memory IPC transport"
     LANGUAGES CXX
 )
