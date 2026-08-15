@@ -1,5 +1,3 @@
-
-
 #include <atomic>
 #include <benchmark/benchmark.h>
 #include <chrono>
@@ -107,7 +105,8 @@ void BM_Throughput(benchmark::State& state) {
     }
 
     state.SetItemsProcessed(state.iterations() * static_cast<std::int64_t>(measure_count));
-    state.SetBytesProcessed(state.iterations() * static_cast<std::int64_t>(measure_count) * sizeof(Msg));
+    state.SetBytesProcessed(state.iterations() * static_cast<std::int64_t>(measure_count) *
+                            static_cast<std::int64_t>(sizeof(Msg)));
     state.counters["msg_size_bytes"] = sizeof(Msg);
     state.counters["ring_capacity"]  = kCapacity;
 }

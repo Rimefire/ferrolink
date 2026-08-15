@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <print>
@@ -12,7 +13,7 @@ namespace ferrolink::bench {
 inline bool pin_to_core(int core) noexcept {
     cpu_set_t set;
     CPU_ZERO(&set);
-    CPU_SET(core, &set);
+    CPU_SET(static_cast<std::size_t>(core), &set);
 
     if (::sched_setaffinity(0, sizeof(set), &set) != 0) {
         std::print(stderr, "[WARN] sched_setaffinity(core={}) failed: {}\n", core, std::strerror(errno));
