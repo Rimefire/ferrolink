@@ -246,10 +246,24 @@ TEST(SPSCBufferConcurrency, BurstyProducerSlowConsumerNoLoss) {
 }
 
 TEST(SPSCBufferAlignment, IndicesDoNotShareCacheLine) {
+    // Previously this test only checked sizeof(SmallBuffer) % alignof(std::max_align_t),
+    // which says nothing about false sharing between read_index_/write_index_/slots_ —
+    // std::max_align_t alignment (typically 16) is unrelated to the 64-byte cache-line
+    // alignment the class actually relies on, and the old test never even read the
+    // buffer's own address. read_index_/write_index_/slots_ are private, so we can't
+    // offsetof() them directly from here; instead we check the one thing observable
+    // from the public API that would fail to hold if alignas() weren't doing its job:
+    // the whole object's address and total size must both be multiples of
+    // DestructiveSize, since three back-to-back alignas(64) members force the compiler
+    // to pad the class to a 64-byte-aligned, 64-byte-multiple layout.
     SmallBuffer buf;
-    const auto* read_addr = reinterpret_cast<const std::byte*>(&buf);
-    (void) read_addr;
-    EXPECT_EQ(sizeof(SmallBuffer) % alignof(std::max_align_t), 0u);
+    const auto  obj_addr = reinterpret_cast<std::uintptr_t>(&buf);
+
+    EXPECT_EQ(obj_addr % detail::cacheline::DestructiveSize, 0u)
+        << "SPSCBuffer instance is not itself cache-line aligned";
+    EXPECT_EQ(sizeof(SmallBuffer) % detail::cacheline::DestructiveSize, 0u)
+        << "sizeof(SPSCBuffer) is not a multiple of the cache-line size; "
+           "alignas() padding between read_index_/write_index_/slots_ may not be in effect";
 }
 
 TEST(SPSCBufferAlignment, CapacityMustBePowerOfTwoAtCompileTime) {
