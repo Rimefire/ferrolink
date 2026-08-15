@@ -1,5 +1,3 @@
-// consumer.cpp
-//
 // Manual, hands-on example: run `producer` in one terminal first, then run
 // this in another. This process attaches to the shared-memory channel the
 // producer created and prints each tick as it arrives, verifying sequence
@@ -22,10 +20,9 @@
 // producer hasn't created it yet. If you see an abort on startup, that's
 // almost certainly why; start producer first and try again.
 
-#include "market_tick.hpp"
-
 #include <atomic>
 #include <chrono>
+#include <common/market_tick.hpp>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -37,7 +34,7 @@
 #include <string_view>
 #include <thread>
 
-namespace {
+namespace ferrolink::examples::consumer {
 
 using ferrolink::examples::kChannelCapacity;
 using ferrolink::examples::kChannelName;
@@ -107,7 +104,7 @@ Options parse_args(int argc, char** argv) {
     return opts;
 }
 
-} // namespace
+} // namespace ferrolink::examples::consumer
 
 int main(int argc, char** argv) {
     Options opts = parse_args(argc, argv);
