@@ -1,5 +1,3 @@
-// producer.cpp
-//
 // Manual, hands-on example: run this in one terminal, then run `consumer`
 // in another. This process creates the shared-memory channel and streams
 // simulated market ticks into it at a fixed rate, forever, until you stop
@@ -22,10 +20,9 @@
 // that object to already exist and aborts if it doesn't. This mirrors the
 // real requirement documented on SPSCShmChannel::attach().
 
-#include "market_tick.hpp"
-
 #include <atomic>
 #include <chrono>
+#include <common/market_tick.hpp>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -37,7 +34,7 @@
 #include <string>
 #include <thread>
 
-namespace {
+namespace ferrolink::examples::producer {
 
 using ferrolink::examples::kChannelCapacity;
 using ferrolink::examples::kChannelName;
@@ -142,7 +139,7 @@ MarketTick make_tick(std::uint64_t seq) noexcept {
     return tick;
 }
 
-} // namespace
+} // namespace ferrolink::examples::producer
 
 int main(int argc, char** argv) {
     Options opts = parse_args(argc, argv);
