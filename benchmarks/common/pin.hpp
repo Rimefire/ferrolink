@@ -5,11 +5,19 @@
 #include <print>
 #include <sched.h>
 
+/// @file pin.hpp
+/// @brief Thread/process CPU affinity and scheduling helpers for benchmarking.
 namespace ferrolink::bench {
 
-// Pins the current process/thread to a specific logical core.
-// Non-fatal on failure (e.g. if that core number simply doesn't exist on this machine) —
-// prints a warning and keeps running on whatever core the scheduler assigns.
+/// @brief Pins the current process/thread to a specific logical core.
+///
+/// Non-fatal on failure (e.g. if that core number simply doesn't exist on this
+/// machine) — prints a warning and keeps running on whatever core the scheduler
+/// assigns.
+///
+/// @param core Logical CPU index to pin the calling thread to.
+/// @return `true` on success, `false` if `sched_setaffinity` failed (a warning
+///         is printed to stderr in that case).
 inline bool pin_to_core(int core) noexcept {
     cpu_set_t set;
     CPU_ZERO(&set);
@@ -22,13 +30,22 @@ inline bool pin_to_core(int core) noexcept {
     return true;
 }
 
-// WARNING: SCHED_FIFO without a periodic sched_yield()/blocking call inside a busy-spin
-// loop can stall the entire CPU on a single-core or virtualized machine — FIFO tasks are
-// not voluntarily preempted by the scheduler. Only enable this when you are certain that
-// the producer and consumer are pinned to DIFFERENT physical cores (ideally with
-// isolcpus/nohz_full on them too), otherwise you risk a full machine lockup that may
-// require a hard reset. This function is not called by default in any benchmark here.
-// Requires CAP_SYS_NICE / root.
+/// @brief Attempts to switch the calling thread to the `SCHED_FIFO` real-time
+///        scheduling policy at the given priority.
+///
+/// @warning `SCHED_FIFO` without a periodic `sched_yield()`/blocking call inside a
+/// busy-spin loop can stall the entire CPU on a single-core or virtualized machine —
+/// FIFO tasks are not voluntarily preempted by the scheduler. Only enable this when
+/// you are certain that the producer and consumer are pinned to **different physical
+/// cores** (ideally with `isolcpus`/`nohz_full` on them too), otherwise you risk a
+/// full machine lockup that may require a hard reset. This function is not called by
+/// default in any benchmark here.
+///
+/// @note Requires `CAP_SYS_NICE` / root.
+///
+/// @param priority SCHED_FIFO priority to request (default 80).
+/// @return `true` on success, `false` if `sched_setscheduler` failed (a warning is
+///         printed to stderr in that case, typically due to missing privileges).
 inline bool try_realtime_priority(int priority = 80) noexcept {
     sched_param sp{};
     sp.sched_priority = priority;
