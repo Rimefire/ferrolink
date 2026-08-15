@@ -1,3 +1,8 @@
+// Copyright (c) 2026-present Rimefire. All rights reserved.
+// Proprietary and confidential — unauthorized copying, distribution, or use
+// of this file, via any medium, is strictly prohibited. See LICENSE at the
+// repository root.
+
 // Manual, hands-on example: run `producer` in one terminal first, then run
 // this in another. This process attaches to the shared-memory channel the
 // producer created and prints each tick as it arrives, verifying sequence

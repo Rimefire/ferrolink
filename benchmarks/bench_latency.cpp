@@ -1,3 +1,8 @@
+// Copyright (c) 2026-present Rimefire. All rights reserved.
+// Proprietary and confidential — unauthorized copying, distribution, or use
+// of this file, via any medium, is strictly prohibited. See LICENSE at the
+// repository root.
+
 // The server (ponger) is started ONCE, on a separate std::thread, BEFORE entering
 // `for (auto _ : state)` — recreating the channel on every single ping-pong would be
 // absurdly expensive and would distort the exact thing we're trying to measure. Each

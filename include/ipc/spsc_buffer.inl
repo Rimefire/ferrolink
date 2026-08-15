@@ -1,3 +1,8 @@
+// Copyright (c) 2026-present Rimefire. All rights reserved.
+// Proprietary and confidential — unauthorized copying, distribution, or use
+// of this file, via any medium, is strictly prohibited. See LICENSE at the
+// repository root.
+
 namespace ferrolink::ipc::spsc {
 
 template <typename T, std::size_t Capacity>

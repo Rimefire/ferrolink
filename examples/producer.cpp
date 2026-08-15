@@ -1,3 +1,8 @@
+// Copyright (c) 2026-present Rimefire. All rights reserved.
+// Proprietary and confidential — unauthorized copying, distribution, or use
+// of this file, via any medium, is strictly prohibited. See LICENSE at the
+// repository root.
+
 // Manual, hands-on example: run this in one terminal, then run `consumer`
 // in another. This process creates the shared-memory channel and streams
 // simulated market ticks into it at a fixed rate, forever, until you stop

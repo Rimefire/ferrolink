@@ -1,3 +1,8 @@
+# Copyright (c) 2026-present Rimefire. All rights reserved.
+# Proprietary and confidential — unauthorized copying, distribution, or use
+# of this file, via any medium, is strictly prohibited. See LICENSE at the
+# repository root.
+
 # GoogleTest via FetchContent
 # Pinned to a specific tag rather than a floating branch — a low-latency
 # project should not have its test infrastructure silently change under it.
