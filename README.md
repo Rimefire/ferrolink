@@ -374,11 +374,11 @@ first `create()`/`attach()` call in the process:
 *after* the first `create()`/`attach()` call, not before:
 
 ```cpp
-// ✅ correct — your handler wins for SIGINT/SIGTERM from here on
+// correct — your handler wins for SIGINT/SIGTERM from here on
 auto channel = SPSCShmChannel<Msg, Capacity>::create("my_channel");
 install_my_graceful_shutdown_handler();
 
-// ❌ wrong — shm_registry silently discards this the moment create() runs
+// wrong — shm_registry silently discards this the moment create() runs
 install_my_graceful_shutdown_handler();
 auto channel = SPSCShmChannel<Msg, Capacity>::create("my_channel");
 ```
