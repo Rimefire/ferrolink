@@ -5,15 +5,39 @@
 #include <print>
 #include <vector>
 
+/// @file stats.hpp
+/// @brief Latency-sample statistics computation and reporting for benchmarks.
 namespace ferrolink::bench {
 
+/// @brief Summary statistics computed over a set of latency samples (in nanoseconds).
+///
+/// All fields default to zero, which is also the result returned by
+/// compute_latency_stats() for an empty input.
 struct LatencyStats {
-    std::size_t count{0};
-    double      min{0}, mean{0}, stddev{0};
-    double      p50{0}, p90{0}, p99{0}, p999{0}, p9999{0}, max{0};
+    std::size_t count{0};  ///< Number of samples the statistics were computed over.
+    double      min{0};    ///< Minimum sample value, in nanoseconds.
+    double      mean{0};   ///< Arithmetic mean of all samples, in nanoseconds.
+    double      stddev{0}; ///< Population standard deviation of the samples, in nanoseconds.
+    double      p50{0};    ///< 50th percentile (median), in nanoseconds.
+    double      p90{0};    ///< 90th percentile, in nanoseconds.
+    double      p99{0};    ///< 99th percentile, in nanoseconds.
+    double      p999{0};   ///< 99.9th percentile, in nanoseconds.
+    double      p9999{0};  ///< 99.99th percentile, in nanoseconds.
+    double      max{0};    ///< Maximum sample value, in nanoseconds.
 };
 
-// samples_ns is modified in place (sorted) — cheaper than making a copy for huge sample sets.
+/// @brief Computes min/mean/stddev/percentiles/max over a set of latency samples.
+///
+/// Percentiles are computed using the nearest-rank method:
+/// `index = clamp(floor(p * n), 0, n - 1)` on the sorted sample array.
+///
+/// @param[in,out] samples_ns Latency samples in nanoseconds. Sorted in place as a
+///                            side effect — this is cheaper than making a defensive
+///                            copy for large sample sets, but means the caller's
+///                            vector will come out sorted (and its order should not
+///                            be relied upon afterwards).
+/// @return A LatencyStats populated from @p samples_ns, or a default-constructed
+///         (all-zero) LatencyStats if @p samples_ns is empty.
 inline LatencyStats compute_latency_stats(std::vector<double>& samples_ns) noexcept {
     LatencyStats stats{};
     if (samples_ns.empty())
@@ -55,6 +79,10 @@ inline LatencyStats compute_latency_stats(std::vector<double>& samples_ns) noexc
     return stats;
 }
 
+/// @brief Pretty-prints a LatencyStats report to stdout.
+///
+/// @param s     Statistics to print, typically produced by compute_latency_stats().
+/// @param title Title line printed above the report (e.g. the benchmark name).
 inline void print_latency_report(const LatencyStats& s, const char* title) noexcept {
     std::print("\n=== {} ===\n", title);
     std::print("samples : {}\n", s.count);
