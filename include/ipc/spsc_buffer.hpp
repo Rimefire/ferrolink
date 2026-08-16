@@ -51,8 +51,8 @@ class SPSCBuffer {
 
   public:
     /// @brief Constructs an empty buffer with both indices at zero.
-    SPSCBuffer() noexcept  = default;
-    ~SPSCBuffer() noexcept = default;
+    [[gnu::cold]] SPSCBuffer() noexcept  = default;
+    [[gnu::cold]] ~SPSCBuffer() noexcept = default;
 
     /// @name Non-copyable, non-movable
     /// @brief The buffer's address is meaningful (it may be placed in shared memory
@@ -69,7 +69,7 @@ class SPSCBuffer {
     ///
     /// @param value Element to copy into the buffer.
     /// @return `true` if the value was enqueued, `false` if the buffer is full().
-    bool push(const T& value) noexcept;
+    [[nodiscard, gnu::hot, gnu::always_inline]] bool push(const T& value) noexcept;
 
     /// @brief Attempts to dequeue the oldest element into @p out. Must only be called
     ///        by the single consumer.
@@ -77,31 +77,31 @@ class SPSCBuffer {
     /// @param[out] out Destination for the dequeued element. Left unmodified if the
     ///                 buffer is empty().
     /// @return `true` if an element was dequeued, `false` if the buffer is empty().
-    bool pop(T& out) noexcept;
+    [[nodiscard, gnu::hot, gnu::always_inline]] bool pop(T& out) noexcept;
 
     /// @brief Checks whether the buffer currently holds no elements.
     ///
     /// @return `true` if empty. Safe to call from either producer or consumer, but
     ///         the result may be immediately stale due to concurrent activity on the
     ///         other side.
-    bool empty() const noexcept;
+    [[nodiscard, gnu::cold]] bool empty() const noexcept;
 
     /// @brief Checks whether the buffer currently holds Capacity elements.
     ///
     /// @return `true` if full. Safe to call from either producer or consumer, but
     ///         the result may be immediately stale due to concurrent activity on the
     ///         other side.
-    bool full() const noexcept;
+    [[nodiscard, gnu::cold]] bool full() const noexcept;
 
     /// @brief Returns a snapshot of how many elements are currently in the buffer.
     ///
     /// @return Number of elements, in `[0, Capacity]`. May be immediately stale due
     ///         to concurrent push()/pop() calls.
-    std::size_t filled_size() const noexcept;
+    [[nodiscard, gnu::cold]] std::size_t filled_size() const noexcept;
 
     /// @brief Returns the compile-time capacity of the buffer.
     /// @return Capacity, as given by the class template parameter.
-    static constexpr std::size_t capacity() noexcept;
+    [[nodiscard, gnu::cold, gnu::const]] static constexpr std::size_t capacity() noexcept;
 
   private:
     /// @brief Consumer-owned read cursor (monotonically increasing, wraps via mask_).
