@@ -6,7 +6,7 @@
 namespace ferrolink::ipc::transport {
 template <typename ChannelType, typename MessageType>
     requires Channel<ChannelType, MessageType>
-bool TransportProducer<ChannelType, MessageType>::try_send(const MessageType& message) noexcept {
+inline bool TransportProducer<ChannelType, MessageType>::try_send(const MessageType& message) noexcept {
     // Pure pass-through to the underlying channel's buffer — Transport adds no
     // buffering/queueing of its own, it's just a validated, typed handle.
     return channel_.buffer()->push(message);
@@ -14,7 +14,7 @@ bool TransportProducer<ChannelType, MessageType>::try_send(const MessageType& me
 
 template <typename ChannelType, typename MessageType>
     requires Channel<ChannelType, MessageType>
-bool TransportConsumer<ChannelType, MessageType>::try_recv(MessageType& out) noexcept {
+inline bool TransportConsumer<ChannelType, MessageType>::try_recv(MessageType& out) noexcept {
     // Mirror of try_send() above, pass-through to the buffer's pop().
     return channel_.buffer()->pop(out);
 }
