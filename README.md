@@ -16,6 +16,28 @@ Two processes, one ring buffer, `std::atomic` doing all the work.
 
 ---
 
+## Table of contents
+
+- [Is this for you?](#is-this-for-you)
+- [Why ferrolink](#why-ferrolink)
+- [Requirements](#requirements)
+- [Getting started](#getting-started)
+- [Quick start](#quick-start)
+- [Architectural contracts](#architectural-contracts)
+  - [Contract 1 — `create()` before any peer's `attach()`](#contract-1-create-must-run-and-complete-before-any-peers-attach)
+  - [Contract 2 — exactly one producer, one consumer](#contract-2-exactly-one-producer-exactly-one-consumer--always)
+  - [Contract 3 — setup failures `abort()`, no error-code path](#contract-3-unrecoverable-setup-failures-abort--there-is-no-error-code-path)
+  - [Contract 4 — `mlock` and `RLIMIT_MEMLOCK`](#contract-4-mlock-and-rlimit_memlock--this-will-abort-in-a-fresh-container)
+  - [Contract 5 — signal handling](#contract-5-signal-handling--shm_registry-owns-sigint-sigterm-sigabrt-sigsegv)
+  - [Memory layout & false sharing](#memory-layout--false-sharing)
+- [Benchmarks](#benchmarks)
+- [Project layout](#project-layout)
+- [Testing](#testing)
+- [Confidentiality](#confidentiality)
+- [License](#license)
+
+---
+
 > **At a glance:** two Linux processes, one strict producer, one strict
 > consumer, fixed-shape trivially-copyable messages, `/dev/shm` instead of a
 > socket. If that's not your exact shape — multiple producers, multiple
@@ -84,7 +106,7 @@ something else.
 - **Linux only** — built directly on POSIX `shm_open`/`mmap`/`mlock`; `CMakeLists.txt` refuses to configure on anything but Linux
 - **C++23 compiler** — GCC or Clang; uses `std::print`, `std::format`, and C++20/23 concepts throughout
 - **CMake ≥ 3.25**
-- **Sufficient `RLIMIT_MEMLOCK`** — see [Contract 4](#contract-4-mlock-and-rlimit_memlock-this-will-abort-in-a-fresh-container) before deploying anywhere with default container/systemd limits
+- **Sufficient `RLIMIT_MEMLOCK`** — see [Contract 4](#contract-4-mlock-and-rlimit_memlock--this-will-abort-in-a-fresh-container) before deploying anywhere with default container/systemd limits
 - Tests and benchmarks fetch **GoogleTest** and **Google Benchmark** automatically via `FetchContent`
 
 ---
@@ -168,7 +190,7 @@ service.
 | 1 | [`create()` before any peer's `attach()`](#contract-1-create-must-run-and-complete-before-any-peers-attach) | Process **aborts** (missing segment or `EEXIST`) |
 | 2 | [Exactly one producer, one consumer](#contract-2-exactly-one-producer-exactly-one-consumer--always) | Ring buffer **silently corrupts** |
 | 3 | [Setup failures `abort()` — no error-code path](#contract-3-unrecoverable-setup-failures-abort--there-is-no-error-code-path) | Process is **already gone** — nothing to catch |
-| 4 | [`mlock` needs sufficient `RLIMIT_MEMLOCK`](#contract-4-mlock-and-rlimit_memlock-this-will-abort-in-a-fresh-container) | **Aborts** on first run in a fresh container/pod |
+| 4 | [`mlock` needs sufficient `RLIMIT_MEMLOCK`](#contract-4-mlock-and-rlimit_memlock--this-will-abort-in-a-fresh-container) | **Aborts** on first run in a fresh container/pod |
 | 5 | [`shm_registry` owns 4 signals](#contract-5-signal-handling--shm_registry-owns-sigint-sigterm-sigabrt-sigsegv) | Your own handler is **silently discarded** |
 
 Four of these five end in `abort()` by design — a loud, immediate crash beats
@@ -352,11 +374,11 @@ first `create()`/`attach()` call in the process:
 *after* the first `create()`/`attach()` call, not before:
 
 ```cpp
-// ✅ correct — your handler wins for SIGINT/SIGTERM from here on
+// correct — your handler wins for SIGINT/SIGTERM from here on
 auto channel = SPSCShmChannel<Msg, Capacity>::create("my_channel");
 install_my_graceful_shutdown_handler();
 
-// ❌ wrong — shm_registry silently discards this the moment create() runs
+// wrong — shm_registry silently discards this the moment create() runs
 install_my_graceful_shutdown_handler();
 auto channel = SPSCShmChannel<Msg, Capacity>::create("my_channel");
 ```
