@@ -109,7 +109,7 @@ inline void ensure_signal_handlers_registered() noexcept {
 ///
 /// @note Aborts the process if no free slot is available (registry is full, i.e.
 ///       kMaxChannels channels are already registered).
-inline std::size_t register_name(const char* name) noexcept {
+[[nodiscard, gnu::cold]] inline std::size_t register_name(const char* name) noexcept {
     for (std::size_t slot{}; slot < registry.size(); ++slot) {
         if (!registry[slot].in_use) {
             std::strncpy(registry[slot].shm_name, name, sizeof(registry[slot].shm_name) - 1);
