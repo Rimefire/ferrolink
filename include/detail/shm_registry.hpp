@@ -53,7 +53,7 @@ inline std::array<Slot, kMaxChannels> registry{};
 ///
 /// @param sig Signal number (unused; the same handler is shared by all registered
 ///            signals).
-inline void sig_handler([[maybe_unused]] int sig) noexcept {
+[[gnu::cold]] inline void sig_handler([[maybe_unused]] int sig) noexcept {
     for (auto& slot : registry) {
         if (slot.in_use) {
             ::shm_unlink(slot.shm_name);
@@ -71,14 +71,14 @@ inline void sig_handler([[maybe_unused]] int sig) noexcept {
 /// @note Aborts the process (via `std::abort()`) if signal mask initialization or
 ///       `sigaction` registration fails, since a partially-installed crash handler
 ///       is worse than none (silent leak vs. loud failure).
-inline void ensure_signal_handlers_registered() noexcept {
-    if (handlers_reg)
+[[gnu::cold]] inline void ensure_signal_handlers_registered() noexcept {
+    if (handlers_reg) [[likely]]
         return;
 
     struct sigaction sig_act {};
     sig_act.sa_handler = sig_handler;
 
-    if (::sigemptyset(&sig_act.sa_mask) != 0) {
+    if (::sigemptyset(&sig_act.sa_mask) != 0) [[unlikely]] {
         std::print(stderr, "[FATAL] Failed to initialize signal mask. ERRNO: {}\n", std::strerror(errno));
         std::abort();
     }
@@ -87,7 +87,7 @@ inline void ensure_signal_handlers_registered() noexcept {
 
     static constexpr int signals[]{SIGABRT, SIGTERM, SIGSEGV, SIGINT};
     for (int signum : signals) {
-        if (::sigaction(signum, &sig_act, nullptr) != 0) {
+        if (::sigaction(signum, &sig_act, nullptr) != 0) [[unlikely]] {
             std::print(stderr,
                        "[FATAL] Failed to register signal handler for signal {}. ERRNO: {}",
                        ::strsignal(signum),
@@ -111,7 +111,7 @@ inline void ensure_signal_handlers_registered() noexcept {
 ///       kMaxChannels channels are already registered).
 [[nodiscard, gnu::cold]] inline std::size_t register_name(const char* name) noexcept {
     for (std::size_t slot{}; slot < registry.size(); ++slot) {
-        if (!registry[slot].in_use) {
+        if (!registry[slot].in_use) [[likely]] {
             std::strncpy(registry[slot].shm_name, name, sizeof(registry[slot].shm_name) - 1);
             registry[slot].shm_name[sizeof(registry[slot].shm_name) - 1] = '\0';
             registry[slot].in_use                                        = true;
@@ -134,13 +134,13 @@ inline void ensure_signal_handlers_registered() noexcept {
 ///
 /// @note Non-fatal: prints a warning to stderr and returns without effect if
 ///       @p slot is out of range or not currently in use.
-inline void unregister(std::size_t slot) noexcept {
-    if (slot >= registry.size()) {
+[[gnu::cold]] inline void unregister(std::size_t slot) noexcept {
+    if (slot >= registry.size()) [[unlikely]] {
         std::print(stderr, "[WARN] Slot number is greater than registry size");
         return;
     }
 
-    if (!registry[slot].in_use) {
+    if (!registry[slot].in_use) [[unlikely]] {
         std::print(stderr, "[WARN] Slot not in use\n");
         return;
     }
