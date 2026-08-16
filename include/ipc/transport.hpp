@@ -62,7 +62,7 @@ class TransportProducer {
     /// @param message Message to send.
     /// @return `true` if enqueued, `false` if the underlying buffer is full (caller
     ///         is expected to retry/spin, e.g. with bench::cpu_relax()).
-    bool try_send(const MessageType& message) noexcept;
+    [[nodiscard, gnu::hot, gnu::always_inline]] bool try_send(const MessageType& message) noexcept;
 
     /// @name Non-copyable, non-movable
     ///@{
@@ -113,7 +113,7 @@ class TransportConsumer {
     /// @return `true` if a message was received, `false` if the underlying buffer
     ///         is empty (caller is expected to retry/spin, e.g. with
     ///         bench::cpu_relax()).
-    bool try_recv(MessageType& out) noexcept;
+    [[nodiscard, gnu::hot, gnu::always_inline]] bool try_recv(MessageType& out) noexcept;
 
     /// @name Non-copyable, non-movable
     ///@{
@@ -164,14 +164,16 @@ class Transport {
     ///
     /// @param name Channel/object name, forwarded to `ChannelType::create`.
     /// @return A TransportProducer owning the newly-created channel.
-    static auto create(std::string name) noexcept -> TransportProducer<ChannelType, MessageType>;
+    [[nodiscard, gnu::cold]] static auto create(std::string name) noexcept
+        -> TransportProducer<ChannelType, MessageType>;
 
     /// @brief Attaches to an existing underlying channel (via `ChannelType::attach`)
     ///        and wraps it in a TransportConsumer.
     ///
     /// @param name Channel/object name, matching a prior create() call.
     /// @return A TransportConsumer owning the attached channel.
-    static auto attach(std::string name) noexcept -> TransportConsumer<ChannelType, MessageType>;
+    [[nodiscard, gnu::cold]] static auto attach(std::string name) noexcept
+        -> TransportConsumer<ChannelType, MessageType>;
 
     Transport() = delete;
 
