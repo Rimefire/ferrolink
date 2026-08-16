@@ -8,8 +8,8 @@
 #include <cstdint>
 #include <cstring>
 #include <gtest/gtest.h>
-#include <ipc/spsc_shm_channel.hpp>
-#include <ipc/transport.hpp>
+#include <ferrolink/ipc/spsc_shm_channel.hpp>
+#include <ferrolink/ipc/transport.hpp>
 #include <string>
 #include <sys/mman.h>
 #include <sys/wait.h>

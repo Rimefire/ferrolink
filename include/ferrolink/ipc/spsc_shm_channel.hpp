@@ -9,10 +9,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <detail/shm_registry.hpp>
+#include <ferrolink/detail/shm_registry.hpp>
 #include <fcntl.h>
 #include <format>
-#include <ipc/spsc_buffer.hpp>
+#include <ferrolink/ipc/spsc_buffer.hpp>
 #include <print>
 #include <string>
 #include <sys/mman.h>
@@ -191,4 +191,4 @@ class SPSCShmChannel {
 };
 } // namespace ferrolink::ipc::shm_channel
 
-#include <ipc/spsc_shm_channel.inl>
+#include <ferrolink/ipc/spsc_shm_channel.inl>

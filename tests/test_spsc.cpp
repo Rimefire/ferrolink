@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
-#include <ipc/spsc_buffer.hpp>
+#include <ferrolink/ipc/spsc_buffer.hpp>
 #include <memory>
 #include <thread>
 #include <type_traits>

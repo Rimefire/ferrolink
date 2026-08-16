@@ -5,8 +5,6 @@
 
 #pragma once
 #include <cstddef>
-#include <new>
-
 /// @file cache_line.hpp
 /// @brief Portable cache-line size constants used to align hot data and avoid false sharing.
 ///
