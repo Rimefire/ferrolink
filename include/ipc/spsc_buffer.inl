@@ -42,7 +42,7 @@ std::size_t SPSCBuffer<T, Capacity>::filled_size() const noexcept {
 
 template <typename T, std::size_t Capacity>
     requires TriviallyCopyable<T>
-bool SPSCBuffer<T, Capacity>::push(const T& value) noexcept {
+inline bool SPSCBuffer<T, Capacity>::push(const T& value) noexcept {
     // Producer-only. write_index_ is ours: relaxed load is fine, nobody else writes it.
     const auto curr_write_idx{write_index_.load(std::memory_order_relaxed)};
     // read_index_ belongs to the consumer: acquire so we observe its latest release
@@ -67,7 +67,7 @@ bool SPSCBuffer<T, Capacity>::push(const T& value) noexcept {
 
 template <typename T, std::size_t Capacity>
     requires TriviallyCopyable<T>
-bool SPSCBuffer<T, Capacity>::pop(T& out) noexcept {
+inline bool SPSCBuffer<T, Capacity>::pop(T& out) noexcept {
     // Consumer-only, mirror of push(): read_index_ is ours (relaxed), write_index_
     // is the producer's (acquire, to see the latest pushed slot).
     const auto curr_read_idx{read_index_.load(std::memory_order_relaxed)};
