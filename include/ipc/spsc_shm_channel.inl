@@ -20,7 +20,7 @@ SPSCShmChannel<T, Capacity> SPSCShmChannel<T, Capacity>::create(std::string obj_
     // the descriptor is only needed to create the mapping.
     auto cleanup{[&fd]() { ::close(fd); }};
 
-    if (::ftruncate(fd, shm_size_) != 0) {
+    if (::ftruncate(fd, shm_size_) != 0) [[unlikely]] {
         std::print(stderr, "[FATAL] Cannot truncate size of the object. ERRNO: {}\n", std::strerror(errno));
         cleanup();
         std::abort();
@@ -31,7 +31,7 @@ SPSCShmChannel<T, Capacity> SPSCShmChannel<T, Capacity>::create(std::string obj_
     int   saved_errno{errno};
     cleanup();
 
-    if (mmap_result == MAP_FAILED) {
+    if (mmap_result == MAP_FAILED) [[unlikely]] {
         std::print(stderr, "[FATAL] Cannot map shared object to memory. ERRNO: {}\n", std::strerror(saved_errno));
         std::abort();
     }
@@ -68,7 +68,7 @@ SPSCShmChannel<T, Capacity> SPSCShmChannel<T, Capacity>::attach(std::string obj_
     int saved_errno{errno};
     cleanup();
 
-    if (mmap_result == MAP_FAILED) {
+    if (mmap_result == MAP_FAILED) [[unlikely]] {
         std::print(stderr, "[FATAL] Cannot map shared object to memory. ERRNO: {}\n", std::strerror(saved_errno));
         std::abort();
     }
@@ -113,7 +113,7 @@ void SPSCShmChannel<T, Capacity>::setup_memory(std::byte* shm_start) noexcept {
     // pages resident, a page fault mid-benchmark would inject unpredictable latency
     // spikes into exactly the measurements this library exists to produce.
     if (!checked_syscall(
-            [&] { return ::mlock(shm_start, shm_size_); }, "Cannot lock virtual address space into RAM", "FATAL")) {
+            [&] { return ::mlock(shm_start, shm_size_); }, "Cannot lock virtual address space into RAM", "FATAL")) [[unlikely]] {
         std::abort();
     }
 }
@@ -123,7 +123,7 @@ template <typename T, std::size_t Capacity>
 int SPSCShmChannel<T, Capacity>::open_shm(const std::string& name, int flags) noexcept {
     int fd{::shm_open(("/" + name).c_str(), flags, 0660)};
 
-    if (fd == -1) {
+    if (fd == -1) [[unlikely]] {
         std::print(
             stderr, "[FATAL] Cannot get file descriptor for shared memory block. ERRNO: {}\n", std::strerror(errno));
         std::abort();
@@ -141,7 +141,7 @@ bool SPSCShmChannel<T, Capacity>::checked_syscall(Fn&&               fn,
     // Generic wrapper for the common "0 on success, check errno on failure" POSIX
     // convention — just logs and reports success/failure, leaves the fatal-or-not
     // decision to the caller (see setup_memory()'s two different usages above).
-    if (fn() != 0) {
+    if (fn() != 0) [[unlikely]] {
         std::print(stderr, "[{}] {}. ERRNO: {}", status, what, std::strerror(errno));
         return false;
     }
