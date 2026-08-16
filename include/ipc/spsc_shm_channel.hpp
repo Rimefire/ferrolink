@@ -61,7 +61,7 @@ class SPSCShmChannel {
     ///
     /// @note Aborts the process on any unrecoverable OS-level failure (shm_open,
     ///       ftruncate, mmap, mlock all abort on failure — see the .inl for details).
-    static SPSCShmChannel create(std::string obj_name) noexcept;
+    [[nodiscard, gnu::cold]] static SPSCShmChannel create(std::string obj_name) noexcept;
 
     /// @brief Attaches to an existing shared-memory segment previously created by
     ///        create() with the same @p obj_name.
@@ -75,7 +75,7 @@ class SPSCShmChannel {
     ///       for ensuring create() has already run (e.g. via program order, as in
     ///       the benchmarks where the producer is created before the consumer
     ///       thread is spawned).
-    static SPSCShmChannel attach(std::string obj_name) noexcept;
+    [[nodiscard, gnu::cold]] static SPSCShmChannel attach(std::string obj_name) noexcept;
 
     /// @name Non-copyable
     ///@{
@@ -130,27 +130,27 @@ class SPSCShmChannel {
     ///
     /// Only the creator is responsible for `shm_unlink`-ing the segment on
     /// destruction, so this also indicates ownership of the segment's lifetime.
-    bool role() const noexcept { return is_creator_; }
+    [[nodiscard]] bool role() const noexcept { return is_creator_; }
 
     /// @brief Read-only access to the mapped buffer.
     /// @return Pointer to the Buffer inside the shared-memory segment, or `nullptr`
     ///         if this instance is default-constructed/moved-from.
-    const Buffer* buffer() const noexcept { return buffer_; }
+    [[nodiscard]] const Buffer* buffer() const noexcept { return buffer_; }
 
     /// @brief Mutable access to the mapped buffer.
     /// @return Pointer to the Buffer inside the shared-memory segment, or `nullptr`
     ///         if this instance is default-constructed/moved-from.
-    Buffer* buffer() noexcept { return buffer_; }
+    [[nodiscard]] Buffer* buffer() noexcept { return buffer_; }
 
     /// @brief Checks whether this channel holds a live shared-memory mapping.
     /// @return `true` if both the mapping and the buffer pointer are non-null.
-    bool is_valid() const noexcept { return shm_start_ != nullptr && buffer_ != nullptr; };
+    [[nodiscard]] bool is_valid() const noexcept { return shm_start_ != nullptr && buffer_ != nullptr; };
 
     /// @brief The POSIX shared-memory object name this channel was created/attached with.
-    const std::string& name() const noexcept { return obj_name_; }
+    [[nodiscard]] const std::string& name() const noexcept { return obj_name_; }
 
     /// @brief Size in bytes of the mapped shared-memory segment (i.e. `sizeof(Buffer)`).
-    std::size_t shm_size() const noexcept { return shm_size_; }
+    [[nodiscard]] std::size_t shm_size() const noexcept { return shm_size_; }
 
   private:
     /// @brief Private constructor used internally by create()/attach() and the
@@ -166,14 +166,14 @@ class SPSCShmChannel {
     /// @brief Applies memory-management advice/locking to the mapped segment
     ///        (`madvise` hints plus `mlock` to pin it resident, preventing paging
     ///        latency spikes). Called by both create() and attach().
-    static void setup_memory(std::byte* shm_start) noexcept;
+    [[gnu::cold]] static void setup_memory(std::byte* shm_start) noexcept;
 
     /// @brief Wraps `shm_open` with fatal (process-aborting) error handling.
     /// @param name  Object name without the leading '/'.
     /// @param flags Flags forwarded to `shm_open` (e.g. `O_CREAT | O_EXCL | O_RDWR`
     ///              for create(), `O_RDWR` for attach()).
     /// @return A valid file descriptor; never returns on failure (aborts instead).
-    static int open_shm(const std::string& name, int flags) noexcept;
+    [[nodiscard, gnu::cold]] static int open_shm(const std::string& name, int flags) noexcept;
 
     /// @brief Runs @p fn, treating a non-zero return as failure: logs @p what
     ///        prefixed with @p status and returns `false`, or returns `true` on
