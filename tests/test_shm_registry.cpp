@@ -179,12 +179,12 @@ TEST(ShmRegistryDeathTest, ExceedingMaxChannelsAborts) {
     EXPECT_DEATH(
         {
             for (std::size_t i = 0; i < kMaxChannels; ++i) {
-                std::string name = "/ferrolink_registry_fill_" + std::to_string(i);
-                register_name(name.c_str());
+                std::string           name = "/ferrolink_registry_fill_" + std::to_string(i);
+                [[maybe_unused]] auto res{register_name(name.c_str())};
             }
             // One more than capacity — must abort() per shm_registry's
             // documented fatal-on-exhaustion behavior.
-            register_name("/ferrolink_registry_overflow");
+            [[maybe_unused]] auto res{register_name("/ferrolink_registry_overflow")};
         },
         "");
 }
@@ -222,7 +222,7 @@ TEST(ShmRegistrySignalSafetyTest, SIGTERMUnlinksRegisteredSegmentButDoesNotTermi
     if (pid == 0) {
         ensure_signal_handlers_registered();
         create_real_shm_object(name);
-        register_name(("/" + name).c_str());
+        [[maybe_unused]] auto res{register_name(("/" + name).c_str())};
 
         sem_t* child_sem = ::sem_open(("/" + sem_name).c_str(), 0);
         if (child_sem == SEM_FAILED)
@@ -276,7 +276,7 @@ TEST(ShmRegistrySignalSafetyTest, SecondSIGTERMTerminatesProcessViaResetDisposit
     if (pid == 0) {
         ensure_signal_handlers_registered();
         create_real_shm_object(name);
-        register_name(("/" + name).c_str());
+        [[maybe_unused]] auto res{register_name(("/" + name).c_str())};
 
         sem_t* child_sem = ::sem_open(("/" + sem_name).c_str(), 0);
         if (child_sem == SEM_FAILED)
@@ -336,7 +336,7 @@ TEST(ShmRegistrySignalSafetyTest, SIGINTUnlinksRegisteredSegmentSameAsSigterm) {
     if (pid == 0) {
         ensure_signal_handlers_registered();
         create_real_shm_object(name);
-        register_name(("/" + name).c_str());
+        [[maybe_unused]] auto res{register_name(("/" + name).c_str())};
 
         sem_t* child_sem = ::sem_open(("/" + sem_name).c_str(), 0);
         if (child_sem == SEM_FAILED)
@@ -391,7 +391,7 @@ TEST(ShmRegistrySignalSafetyTest, UnregisteredSegmentSurvivesSignalUntouched) {
         ensure_signal_handlers_registered();
 
         create_real_shm_object(tracked_name);
-        register_name(("/" + tracked_name).c_str());
+        [[maybe_unused]] auto res{register_name(("/" + tracked_name).c_str())};
 
         // Deliberately create but do NOT register this one.
         create_real_shm_object(untracked_name);
