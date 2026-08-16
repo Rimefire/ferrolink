@@ -11,8 +11,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <ipc/spsc_shm_channel.hpp>
-#include <ipc/transport.hpp>
+#include <ferrolink/ipc/spsc_shm_channel.hpp>
+#include <ferrolink/ipc/transport.hpp>
 #include <print>
 #include <string>
 #include <thread>

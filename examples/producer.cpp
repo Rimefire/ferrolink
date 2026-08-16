@@ -33,8 +33,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <ipc/spsc_shm_channel.hpp>
-#include <ipc/transport.hpp>
+#include <ferrolink/ipc/spsc_shm_channel.hpp>
+#include <ferrolink/ipc/transport.hpp>
 #include <optional>
 #include <print>
 #include <string>

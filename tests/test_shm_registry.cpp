@@ -9,7 +9,7 @@
 #include <csignal>
 #include <cstdint>
 #include <cstring>
-#include <detail/shm_registry.hpp>
+#include <ferrolink/detail/shm_registry.hpp>
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <semaphore.h>
